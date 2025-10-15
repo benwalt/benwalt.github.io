@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Derivative Flashcards</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    /* ---- Flip animation styles ---- */
+    .flip-card {
+      perspective: 1000px;
+      width: 28rem;
+      height: 18rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      /* background-color: transparent; */
+    }
+
+    .flip-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+      border-radius: 1rem;
+      /* box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15); */
+      /* background-color: white; */
+    }
+
+    /* Each face fully fills the card and stays stacked */
+    .flip-face {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 1rem;
+      /* background-color: white; */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+      border: 2px solid rgba(0, 0, 0, 0.05);
+      padding: 1.5rem;
+      box-sizing: border-box;
+      /* transition: box-shadow 0.3s ease; */
+    }
+
+    .flip-front{
+      background-color: #ffffff;
+    }
+
+    /* Back face rotated and different color */
+    .flip-back {
+      transform: rotateY(180deg);
+      background-color: #bfdbfe; /* Tailwind blue-200 */
+    }
+
+    /* Subtle hover lift */
+    .flip-card:hover .flip-face {
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    /* Optional: small "pop" during flip */
+    .flip-card.flipped .flip-inner {
+      transform: rotateY(180deg) scale(1.03); 
+      transition: transform 0.6s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+      transform-style: preserve-3d;
+      /* box-shadow: 0 14px 28px rgba(0, 0, 0, 0.25); */
+    }
+
+  </style>
+
+  <!-- MathJax v3 -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+      },
+      startup: { typeset: false }
+    };
+  </script>
+  <script id="mathjax-script" async
+    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body class="bg-slate-100 flex flex-col items-center justify-center min-h-screen text-center p-4">
+  <div id="app"></div>
+
+  <script>
+    /* ---------------- Utility functions ---------------- */
+    function generateRandomInt(min, max, excludeZero = false, exclude = []) {
+      let num;
+      do {
+        num = Math.floor(Math.random() * (max - min + 1)) + min;
+      } while ((excludeZero && num === 0) || exclude.includes(num));
+      return num;
+    }
+
+    function formatAx(a) {
+      if (a === 1) return 'x';
+      if (a === -1) return '-x';
+      return `${a}x`;
+    }
+    function formatAxPlusB(a, b) {
+      const ax = formatAx(a);
+      return b < 0 ? `${ax} ${b}` : `${ax} + ${b}`;
+    }
+    function formatCube(a, b, c) {
+      const BxPlusC = formatAxPlusB(b, c);
+      const aPrefix = a === 1 ? '' : a === -1 ? '-' : `${a}`;
+      return b < 0 ? `${aPrefix}x^2 ${BxPlusC}` : `${aPrefix}x^2 + ${BxPlusC}`;
+    }
+
+    function basicDeck() {
+      const a0 = generateRandomInt(-9, 9, true);
+      const a1 = generateRandomInt(-9, 9, true);
+      const a2 = generateRandomInt(-9, 9, true);
+      const a3 = generateRandomInt(-9, 9, true);
+      const b2 = generateRandomInt(-9, 9, true, [a2]);
+      const b3 = generateRandomInt(-9, 9, true, [a3]);
+      const c3 = generateRandomInt(-9, 9, true, [a3, b3]);
+      const c = generateRandomInt(2, 9);
+      return [
+        { front: 'x^n', back: 'n x^{n-1}' },
+        { front: `${a0}`, back: '0' },
+        { front: formatAx(a1), back: `${a1}` },
+        { front: formatAxPlusB(a2, b2), back: `${a2}` },
+        { front: formatCube(a3, b3, c3), back: formatAxPlusB(2 * a3, b3) },
+        { front: 'x^{1/2}', back: '\\frac{1}{2}x^{-1/2}' },
+        { front: 'x^{1/4}', back: '\\frac{1}{4}x^{-3/4}' },
+        { front: '\\sqrt{x}', back: '\\frac{1}{2\\sqrt{x}}' },
+        { front: '\\frac{1}{\\sqrt{x}}', back: '-\\frac{1}{2}x^{-3/2}' },
+        { front: '\\sin(x)', back: '\\cos(x)' },
+        { front: '\\cos(x)', back: '-\\sin(x)' },
+        { front: '\\tan(x)', back: '\\sec^2(x)' },
+        { front: '\\sec(x)', back: '\\sec(x)\\tan(x)' },
+        { front: 'e^x', back: 'e^x' },
+        { front: `${c}^x`, back: `${c}^x\\ln(${c})` },
+        { front: '\\ln(x)', back: '\\frac{1}{x}' },
+        { front: `\\log_${c}(x)`, back: `\\frac{1}{x\\ln(${c})}` },
+        { front: '\\arcsin(x)', back: '\\frac{1}{\\sqrt{1-x^2}}' },
+        { front: '\\arctan(x)', back: '\\frac{1}{x^2+1}' },
+        { front: '\\mathrm{arcsec}(x)', back: '\\frac{1}{|x|\\sqrt{x^2-1}}' },
+      ];
+    }
+
+    const trickDeck = [
+      { front: '\\ln(2)', back: '0' },
+      { front: '\\log_2(3)', back: '0' },
+      { front: 'e^2', back: '0' },
+      { front: '\\pi', back: '0' },
+      { front: '\\pi^2', back: '0' },
+      { front: 'e^2 + 3x + 1', back: '3' },
+      { front: '2x^2 + 3e + 1', back: '4x' },
+      { front: '\\sin(2)', back: '0' },
+      { front: '\\arctan(1)', back: '0' },
+    ];
+    const lawDeck = [
+      { front: 'x^2\\,\\sin(x)', back: '2x\\,\\sin(x) + x^2\\,\\cos(x)' },
+      { front: 'x^2\\,\\cos(x)', back: '2x\\,\\cos(x) - x^2\\,\\sin(x)' },
+      { front: '\\sin( x^2 )', back: '\\cos(x^2)\\,2x' },
+      { front: '\\cos( x^2 )', back: '-\\sin(x^2)\\,2x' },
+    ];
+    const implicitDeck = [
+      { front: 'y', back: "y'" },
+      { front: 'y^2', back: "2y\\,y'" },
+      { front: 'y^n', back: "ny^{n-1}\\,y'" },
+      { front: '\\ln(y)', back: "\\frac{y'}{y}" },
+      { front: 'e^{y}', back: "e^y\\,y'" },
+      { front: '\\sin(y)', back: "\\cos(y)\\,y'" },
+      { front: 'xy', back: "y + x\\,y'" },
+      { front: 'x^3 y^2', back: "3x^2 y^2 + 2x^3 y\\,y'" },
+    ];
+
+    /* ---------------- App State ---------------- */
+    let selectedDecks = [];
+    let deck = [];
+    let currentIndex = 0;
+    let showBack = false;
+    let complete = false;
+
+    const app = document.getElementById('app');
+
+    function render() {
+      if (deck.length === 0) {
+        app.innerHTML = `
+          <h2 class="text-2xl font-semibold mb-1">Select Decks to Include</h2>
+          <div class="flex flex-col gap-4 text-left mt-2">
+            ${renderCheckbox('basic', 'Basic — Standard derivatives')}
+            ${renderCheckbox('tricks', 'Tricks — Misleading expressions')}
+            ${renderCheckbox('laws', 'Laws — Product/Chain Rule')}
+            ${renderCheckbox('implicit', 'Implicit — Differentiation')}
+          </div>
+          <button id="startBtn" class="mt-4 px-4 py-2 text-lg bg-green-600 hover:bg-green-700 text-white rounded-xl ${selectedDecks.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}">
+            Start Game
+          </button>
+        `;
+        document.querySelectorAll('input[type=checkbox]').forEach(cb => {
+          cb.addEventListener('change', e => {
+            const v = e.target.value;
+            if (selectedDecks.includes(v)) selectedDecks = selectedDecks.filter(x => x !== v);
+            else selectedDecks.push(v);
+            render();
+          });
+        });
+        document.getElementById('startBtn')?.addEventListener('click', startGame);
+        return;
+      }
+
+      if (complete) {
+        app.innerHTML = `
+          <div class="w-[28rem] min-h-[14rem] flex flex-col items-center justify-center gap-4 shadow-xl rounded-2xl bg-white p-6">
+            <div class="text-2xl font-semibold">Deck complete! Restart?</div>
+            <button id="restartBtn" class="px-4 py-2 text-lg bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">Restart</button>
+          </div>`;
+        document.getElementById('restartBtn').addEventListener('click', restart);
+        return;
+      }
+
+      const card = deck[currentIndex];
+      const progress = `${currentIndex + 1} / ${deck.length}`;
+      const prevDisabled = currentIndex === 0 ? 'opacity-50 cursor-not-allowed' : '';
+
+      app.innerHTML = `
+        <div class="text-sm text-slate-600 mb-2">Card ${progress}</div>
+        <div class="flip-card ${showBack ? 'flipped' : ''}" id="flipCard">
+          <div class="flip-inner">
+            <div class="flip-face flip-front">
+              <div id="mathFront" class="p-6 text-2xl">
+                $$\\frac{d}{dx}\\Biggl[\\;${card.front}\\;\\Biggr]$$
+              </div>
+            </div>
+            <div class="flip-face flip-back">
+              <div id="mathBack" class="p-6 text-2xl">
+                $$\\frac{d}{dx}\\Biggl[\\;${card.front}\\;\\Biggr]$$ $$\\ = \\ ${card.back}$$
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="w-[28rem] flex justify-center gap-6 mt-4">
+          <div class="flex flex-col items-center">
+            <button id="prevBtn" class="px-4 py-2 text-lg bg-gray-300 hover:bg-gray-400 rounded-xl ${prevDisabled}" ${currentIndex === 0 ? 'disabled' : ''}>
+              Prev. Card
+            </button>
+            <div class="text-xs text-slate-500 mt-1">← = Prev</div>
+          </div>
+
+          <div class="flex flex-col items-center">
+            <button id="flipBtn" class="px-4 py-2 text-lg rounded-xl border bg-white">
+              ${showBack ? 'Show Question' : 'Show Answer'}
+            </button>
+            <div class="text-xs text-slate-500 mt-1">Space = Flip</div>
+          </div>
+
+          <div class="flex flex-col items-center">
+            <button id="nextBtn" class="px-4 py-2 text-lg bg-green-500 hover:bg-green-600 text-white rounded-xl">
+              Next Card
+            </button>
+            <div class="text-xs text-slate-500 mt-1">→ = Next</div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('flipBtn').addEventListener('click', () => {
+        showBack = !showBack;
+        const flipCardEl = document.getElementById('flipCard');
+        flipCardEl.classList.toggle('flipped', showBack);
+        // update button label without re-rendering
+        document.getElementById('flipBtn').textContent = showBack ? 'Show Question' : 'Show Answer';
+      });
+      document.getElementById('nextBtn').addEventListener('click', nextCard);
+      document.getElementById('prevBtn').addEventListener('click', prevCard);
+      document.getElementById('flipCard').addEventListener('click', () => {
+        showBack = !showBack;
+        const flipCardEl = document.getElementById('flipCard');
+        flipCardEl.classList.toggle('flipped', showBack);
+        document.getElementById('flipBtn').textContent = showBack ? 'Show Question' : 'Show Answer';
+      });
+     // Ensure initial flipped state matches current showBack (so future toggles animate)
+     const flipCardEl = document.getElementById('flipCard');
+     flipCardEl.classList.toggle('flipped', showBack);
+
+     // Typeset both faces once per card render
+     if (window.MathJax?.typesetPromise) {
+       MathJax.typesetPromise([
+         document.getElementById('mathFront'),
+         document.getElementById('mathBack')
+       ]).catch(e => console.warn(e));
+     }
+    }
+
+
+    function renderCheckbox(value, label) {
+      const checked = selectedDecks.includes(value) ? 'checked' : '';
+      return `<label><input type="checkbox" value="${value}" ${checked}/> ${label}</label>`;
+    }
+
+    function startGame() {
+      let combined = [];
+      if (selectedDecks.includes('basic')) combined = combined.concat(basicDeck());
+      if (selectedDecks.includes('tricks')) combined = combined.concat(trickDeck);
+      if (selectedDecks.includes('laws')) combined = combined.concat(lawDeck);
+      if (selectedDecks.includes('implicit')) combined = combined.concat(implicitDeck);
+      if (!combined.length) return;
+      deck = combined.sort(() => Math.random() - 0.5);
+      currentIndex = 0; showBack = false; complete = false;
+      render();
+    }
+
+    function nextCard() {
+      if (currentIndex < deck.length - 1) { currentIndex++; showBack = false; render(); }
+      else { complete = true; render(); }
+    }
+    function prevCard() {
+      if (currentIndex > 0) { currentIndex--; showBack = false; render(); }
+    }
+    function restart() {
+      selectedDecks = []; deck = []; currentIndex = 0; showBack = false; complete = false; render();
+    }
+
+    document.addEventListener('keydown', e => {
+      if (!deck.length) return;
+      if (e.code === 'ArrowRight') { e.preventDefault(); nextCard(); }
+      if (e.code === 'ArrowLeft') { e.preventDefault(); prevCard(); }
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!deck.length) return;
+        showBack = !showBack;
+        const flipCardEl = document.getElementById('flipCard');
+        flipCardEl?.classList.toggle('flipped', showBack);
+        const btn = document.getElementById('flipBtn');
+        if (btn) btn.textContent = showBack ? 'Show Question' : 'Show Answer';
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>
