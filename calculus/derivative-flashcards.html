@@ -166,10 +166,13 @@
     const lawDeck = [
       { front: 'x^3\\,\\sin(x)', back: '{\\color{red}3x^2}\\,\\sin(x) + x^3\\,{\\color{red}\\cos(x)}' },
       { front: 'x^3\\,\\tan(x)', back: '{\\color{red}3x^2}\\,\\tan(x) + x^3\\,{\\color{red}\\sec^2(x)}' },
-      { front: '\\sin( x^3 )', back: '{\\color{red}\\cos(}x^3{\\color{red})\\,3x^2}' },
-      { front: '\\tan( x^3 )', back: '{\\color{red}\\sec^2(}x^3{\\color{red})\\,3x^2}' },
-      { front: '\\sin^3( x )', back: '{\\color{red}3}\\sin^{{\\color{red}2}}(x)\\,{\\color{red}\\cos(x)}' },
-      { front: '\\tan^3( x )', back: '{\\color{red}2}\\tan^{{\\color{red}2}}(x)\\,{\\color{red}\\sec^2(x)}' },
+      { front: '\\sin(x)\\,\\tan(x)', back: '{\\color{red}\\cos(x)}\\,\\tan(x) + \\sin(x)\\,{\\color{red}\\sec^2(x)}' },
+      { front: '\\ln(x)\\,\\sin(x)', back: '{\\color{red}\\frac{1}{\\,x\\,}}\\,\\sin(x) + \\ln(x)\\,{\\color{red}\\cos(x)}' },
+      { front: '\\ln(x)\\,\\bigl(x^2+3x+4\\bigr)', back: '{\\color{red}\\frac{1}{\\,x\\,}}\\,\\bigl(x^2+3x+4\\bigr) + \\ln(x)\\,{\\color{red}\\bigl(2x+3\\bigr)}' },
+      { front: '\\sin( x^3 )', back: '{\\color{red}\\cos(}x^3{\\color{red})\\,\\cdot\\,3x^2}' },
+      { front: '\\tan( x^3 )', back: '{\\color{red}\\sec^2(}x^3{\\color{red})\\,\\cdot\\,3x^2}' },
+      { front: '\\sin^3( x )', back: '{\\color{red}3}\\sin^{{\\color{red}2}}(x)\\,\\cdot\\,{\\color{red}\\cos(x)}' },
+      { front: '\\tan^3( x )', back: '{\\color{red}2}\\tan^{{\\color{red}2}}(x)\\,\\cdot\\,{\\color{red}\\sec^2(x)}' },
       { front: '\\ln(x^2 + 3x + 4)', back: '\\frac{{\\color{red}2x+3}}{x^2+3x+4}'},
       { front: '\\ln\\bigl(\\tan(x)\\bigr)', back: '\\frac{{\\color{red}\\sec^2(x)}}{\\tan(x)}'},
     ];
