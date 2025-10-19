@@ -184,8 +184,9 @@
       { front: '\\ln(y)', back: "\\frac{y'}{y}" },
       { front: 'e^{y}', back: "e^y\\,y'" },
       { front: '\\sin(y)', back: "\\cos(y)\\,y'" },
-      { front: 'xy', back: "y + x\\,y'" },
-      { front: 'x^3 y^2', back: "3x^2 y^2 + 2x^3 y\\,y'" },
+      { front: 'xy', back: "y\\ +\\ x\\,y'" },
+      { front: '\\sin(x)\,y^2', back: "\\cos(x)\\,y^2\\ + \\ \\sin(x)\\,2y\\,y'"}, 
+      { front: 'x^3 y^2', back: "3x^2 y^2\\ +\\ 2x^3 y\\,y'" },
     ];
 
     /* ---------------- App State ---------------- */
