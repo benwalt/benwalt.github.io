@@ -164,10 +164,14 @@
       { front: '\\arctan(1)', back: '0' },
     ];
     const lawDeck = [
-      { front: 'x^2\\,\\sin(x)', back: '2x\\,\\sin(x) + x^2\\,\\cos(x)' },
-      { front: 'x^2\\,\\cos(x)', back: '2x\\,\\cos(x) - x^2\\,\\sin(x)' },
-      { front: '\\sin( x^2 )', back: '\\cos(x^2)\\,2x' },
-      { front: '\\cos( x^2 )', back: '-\\sin(x^2)\\,2x' },
+      { front: 'x^3\\,\\sin(x)', back: '{\\color{red}3x^2}\\,\\sin(x) + x^3\\,{\\color{red}\\cos(x)}' },
+      { front: 'x^3\\,\\tan(x)', back: '{\\color{red}3x^2}\\,\\tan(x) + x^3\\,{\\color{red}\\sec^2(x)}' },
+      { front: '\\sin( x^3 )', back: '{\\color{red}\\cos(}x^3{\\color{red})\\,3x^2}' },
+      { front: '\\tan( x^3 )', back: '{\\color{red}\\sec^2(}x^3{\\color{red})\\,3x^2}' },
+      { front: '\\sin^3( x )', back: '{\\color{red}3}\\sin^{{\\color{red}2}}(x)\\,{\\color{red}\\cos(x)}' },
+      { front: '\\tan^3( x )', back: '{\\color{red}2}\\tan^{{\\color{red}2}}(x)\\,{\\color{red}\\sec^2(x)}' },
+      { front: '\\ln(x^2 + 3x + 4)', back: '\\frac{{\\color{red}2x+3}}{x^2+3x+4}'},
+      { front: '\\ln\\bigl(\\tan(x)\\bigr)', back: '\\frac{{\\color{red}\\sec^2(x)}}{\\tan(x)}'},
     ];
     const implicitDeck = [
       { front: 'y', back: "y'" },
