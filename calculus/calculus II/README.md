@@ -1,1 +1,1 @@
-This project contains worksheets that I created for MAT 242 Integral Calculus class at the University of the Virgin Islands
+This project contains worksheets that I created for MAT 242 Intro Calulus II (integral calculus) at the University of the Virgin Islands
