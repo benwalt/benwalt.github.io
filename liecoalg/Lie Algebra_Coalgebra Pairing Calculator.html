@@ -401,63 +401,6 @@ function bracketWordLS( word ) {
 	return "[" + bracketWordLS(word.substring(0,newCut)) + bracketWordLS(word.substring(newCut)) + "]";
 }
 
-	
-///////////////////////////////////////////////////////////////////////////////////
-//  bracketWordLS_left
-//     creates the "left" LS bracketing of an LS word:
-//     recursively splits off the largest Lyndon PREFIX (rather than suffix)
-//
-function bracketWordLS_left( word ) {
-	if (word.length <= 1)
-		return word;
-
-	var start = 0;
-	var newSuffix = 1;
-	var mySuffix = 0;
-	var newCut = 1;
-	var repeat = 1;
-
-	for (var j = 1; j < word.length - 1; j++) {
-		if (repeat == 1) {
-			if (word[j] == word[start])
-				start++;
-			else {
-				repeat = 0;
-				start = 0;
-			}
-		}
-		if (word[j] < word[newCut - newSuffix])
-			mySuffix = 0;
-		else {
-			if (word[j] == word[newCut - newSuffix]) {
-				mySuffix++;
-				if (repeat == 0) {
-					if (mySuffix == newSuffix) {
-						var i = 1;
-						for (i = 1; word[j - mySuffix + 1 + i] == word[newCut - newSuffix + 1 + i]; i++) ;
-						if (word[j - mySuffix + 1 + i] > word[newCut - newSuffix + 1 + i]) {
-							newCut = j + 1;
-							repeat = 1;
-						}
-					}
-					if (mySuffix > newSuffix) {
-						newSuffix = mySuffix;
-						newCut = j + 1;
-						repeat = 1;
-					}
-				}
-			} else {
-				newSuffix = 1;
-				mySuffix = 1;
-				newCut = j + 1;
-				repeat = 1;
-			}
-		}
-	}
-
-	return "[" + bracketWordLS_left(word.substring(0, newCut)) + bracketWordLS_left(word.substring(newCut)) + "]";
-}
-
 
 ///////////////////////////////////////////////////////////////////////////////////
 //  bracketWordLeftGreedy
@@ -1103,7 +1046,6 @@ Cell width = <input type="text" name="newWidth" id="newWidth" value="100" size="
 </p><div id="Gen colie"></div>
 <p>
 
-<input type="button" value="Generate left standard brackets" onclick="genLieType(&#39;data&#39;,bracketWordLS_left,&#39;left standard&#39;)">
 <input type="button" value="Generate (right) standard brackets" onclick="genLieType(&#39;data&#39;,bracketWordLS,&#39;(right) standard&#39;)"> 
 <br>
 <input type="button" value="Generate left-greedy brackets" onclick="genLieType(&#39;data&#39;,bracketWordLeftGreedy,&#39;left greedy&#39;)"> 
