@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polynomial Root Explorer</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['\\(','\\)']] },
+  options: { skipHtmlTags: ['script','noscript','style','textarea'] },
+  startup: { typeset: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, sans-serif;
+  color: #111;
+  background: #fff;
+  padding: 1.5rem;
+  max-width: 640px;
+  margin: 0 auto;
+}
+#degree-row { display: flex; align-items: center; gap: 16px; margin-bottom: 1rem; }
+#degree-row span { font-size: 13px; color: #666; }
+.deg-btn {
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 0.5px solid #aaa;
+  background: transparent; cursor: pointer;
+  font-size: 14px; font-weight: 500; color: #111;
+  transition: background 0.15s;
+}
+.deg-btn.active {
+  background: #111; color: #fff; border-color: #111;
+}
+canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
+
+/* ── scaling slider ── */
+#scale-row {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 0.85rem;
+}
+#scale-row label { font-size: 13px; color: #666; white-space: nowrap; }
+#scale-val {
+  font-size: 13px; font-weight: 500; min-width: 3.5ch; text-align: right;
+}
+
+/* Custom slider: thin neutral track, no fill, colored thumb only */
+#scale-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2px;
+  background: #ccc;
+  border-radius: 1px;
+  outline: none;
+  cursor: pointer;
+}
+#scale-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #185FA5;
+  border: none;
+  cursor: pointer;
+}
+#scale-slider::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #185FA5;
+  border: none;
+  cursor: pointer;
+}
+/* No fill on the lower portion (Firefox) */
+#scale-slider::-moz-range-progress { background: transparent; }
+
+@media (prefers-color-scheme: dark) {
+  #scale-slider { background: #444; }
+  #scale-slider::-webkit-slider-thumb { background: #85B7EB; }
+  #scale-slider::-moz-range-thumb    { background: #85B7EB; }
+}
+
+/* ── equation display ── */
+#poly-display {
+  margin-top: 0.85rem;
+  padding: 0.85rem 1.1rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+  border: 0.5px solid #ddd;
+  min-height: 4rem;
+  display: flex;
+  align-items: center;
+}
+#poly-display mjx-container { font-size: 115% !important; }
+
+@media (prefers-color-scheme: dark) {
+  body { background: #1a1a1a; color: #eee; }
+  #degree-row span, #scale-row label { color: #999; }
+  .deg-btn { border-color: #555; color: #eee; }
+  .deg-btn.active { background: #eee; color: #111; border-color: #eee; }
+  #poly-display { background: #242424; border-color: #333; color: #eee; }
+}
+</style>
+</head>
+<body>
+
+<div id="degree-row">
+  <span>degree</span>
+  <div id="deg-btns" style="display:flex;gap:6px;"></div>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="plot"></canvas>
+</div>
+
+<div id="scale-row">
+  <label for="scale-slider">scale <i>a</i></label>
+  <input type="range" id="scale-slider" min="-2" max="2" step="0.1" value="1">
+  <span id="scale-val">1</span>
+</div>
+
+<div id="poly-display">
+  <div id="math-output"></div>
+</div>
+
+<script>
+const canvas = document.getElementById('plot');
+const ctx = canvas.getContext('2d');
+
+// View bounds — mutable so pan/zoom can update them
+let xMin=-5, xMax=5, yMin=-10, yMax=10;
+// Reset values
+const XMIN0=-5, XMAX0=5, YMIN0=-10, YMAX0=10;
+
+// Default roots per degree — symmetric, centered, scaled to stay visible at ±10
+const DEFAULT_ROOTS = {
+  1: [0],
+  2: [-1, 1],
+  3: [-1, 0, 1],
+  4: [-2, -1, 1, 2],
+  5: [-2, -1, 0, 1, 2],
+  6: [-2, -1.4, -0.6, 0.6, 1.4, 2],
+  7: [-2, -1.4, -0.6, 0, 0.6, 1.4, 2]
+};
+
+let degree = 2;
+let roots = [...DEFAULT_ROOTS[2]];
+let scale = 1;           // the 'a' coefficient
+let dragging = null;
+let dragOffsetX = 0;
+let mathJaxReady = false;
+
+// ── MathJax init ──────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  MathJax.startup.promise.then(() => {
+    mathJaxReady = true;
+    updateDisplay();
+  });
+});
+
+// ── canvas sizing & drawing ───────────────────────────────────────
+function setCanvasSize(){
+  const W = document.getElementById('canvas-wrap').clientWidth;
+  canvas.width  = W;
+  canvas.height = Math.round(W * 3/4);  // 4:3 aspect ratio
+}
+
+function toCanvas(x, y){
+  const W=canvas.width, H=canvas.height;
+  return [(x-xMin)/(xMax-xMin)*W, (1-(y-yMin)/(yMax-yMin))*H];
+}
+function fromCanvas(px){ return xMin + px/canvas.width*(xMax-xMin); }
+
+function evalPoly(x){
+  return scale * roots.reduce((a,r) => a*(x-r), 1);
+}
+
+function getColors(){
+  const d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return {
+    axis:  d?'rgba(255,255,255,0.2)' :'rgba(0,0,0,0.15)',
+    grid:  d?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.05)',
+    curve: d?'#85B7EB':'#185FA5',
+    root:  d?'#F09595':'#E24B4A',
+    rootS: d?'#E24B4A':'#A32D2D',
+    text:  d?'rgba(255,255,255,0.45)':'rgba(0,0,0,0.35)',
+    bg:    d?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.02)'
+  };
+}
+
+function draw(){
+  const W=canvas.width, H=canvas.height, C=getColors();
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
+
+  // grid
+  ctx.strokeStyle=C.grid; ctx.lineWidth=1;
+  for(let x=Math.ceil(xMin);x<=Math.floor(xMax);x++){
+    const[px]=toCanvas(x,0);
+    ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();
+  }
+  for(let y=Math.ceil(yMin/2)*2;y<=Math.floor(yMax/2)*2;y+=2){
+    const[,py]=toCanvas(0,y);
+    ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();
+  }
+
+  // axes
+  const[ox,oy]=toCanvas(0,0);
+  ctx.strokeStyle=C.axis; ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(toCanvas(xMin,0)[0],oy);ctx.lineTo(toCanvas(xMax,0)[0],oy);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(ox,toCanvas(0,yMin)[1]);ctx.lineTo(ox,toCanvas(0,yMax)[1]);ctx.stroke();
+
+  // axis labels
+  ctx.fillStyle=C.text; ctx.font='14px system-ui,sans-serif';
+  ctx.textAlign='center';
+  for(let x=Math.ceil(xMin);x<=Math.floor(xMax);x++){
+    if(!x)continue;
+    const[px]=toCanvas(x,0);
+    ctx.fillText(x,px,oy+16);
+  }
+  ctx.textAlign='right';
+  for(let y=Math.ceil(yMin/2)*2;y<=Math.floor(yMax/2)*2;y+=2){
+    if(!y)continue;
+    const[,py]=toCanvas(0,y);
+    ctx.fillText(y,ox-6,py+4);
+  }
+
+  // curve — clip to canvas bounds so we can always lineTo with no boundary gaps
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, W, H);
+  ctx.clip();
+
+  ctx.strokeStyle=C.curve; ctx.lineWidth=3; ctx.lineJoin='round';
+  ctx.beginPath();
+  if(scale === 0){
+    // f(x) = 0 identically — draw along the x-axis
+    const[,py]=toCanvas(0,0);
+    ctx.moveTo(toCanvas(xMin,0)[0],py);
+    ctx.lineTo(toCanvas(xMax,0)[0],py);
+  } else {
+    let started=false;
+    const steps=W*2;
+    for(let i=0;i<=steps;i++){
+      const x=xMin+(i/steps)*(xMax-xMin);
+      const y=evalPoly(x);
+      if(!isFinite(y)){ started=false; continue; }
+      const[px,py]=toCanvas(x,y);
+      if(!started){ctx.moveTo(px,py);started=true;}
+      else ctx.lineTo(px,py);
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // root dots — drawn outside clip so they're never cut at the boundary
+  const[,ry]=toCanvas(0,0);
+  roots.forEach(r=>{
+    const[rx]=toCanvas(r,0);
+    ctx.beginPath();ctx.arc(rx,ry,8,0,2*Math.PI);
+    ctx.fillStyle=C.root; ctx.fill();
+    ctx.strokeStyle=C.rootS; ctx.lineWidth=1.5; ctx.stroke();
+  });
+}
+
+// ── polynomial math ───────────────────────────────────────────────
+function sortedRoots(){ return [...roots].sort((a,b)=>a-b); }
+function isNice(v){ return Math.abs(v - Math.round(v*10)/10) < 1e-9; }
+
+function expandPoly(rs){
+  let c=[1];
+  for(const r of rs){
+    const n=new Array(c.length+1).fill(0);
+    for(let i=0;i<c.length;i++){n[i]+=c[i];n[i+1]-=r*c[i];}
+    c=n;
+  }
+  return c;
+}
+
+function coeffsAreExact(rs){
+  if(!isNice(scale)) return false;
+  return expandPoly(rs).every(c => isNice(scale * c));
+}
+
+function fmtNum(v){
+  const r=Math.round(v*10)/10;
+  if(Number.isInteger(r)) return String(Math.round(r));
+  return r.toFixed(1);
+}
+
+// LaTeX for a single (x - r) factor
+function latexFactor(r){
+  const v=Math.round(r*10)/10;
+  if(Math.abs(v)<1e-9) return 'x';
+  const av=fmtNum(Math.abs(v));
+  return v>0 ? `(x - ${av})` : `(x + ${av})`;
+}
+
+// LaTeX factored form, including the 'a' prefix
+function latexFactored(sr){
+  const THRESH=0.05;
+  const groups=[];
+  for(const r of sr){
+    const last=groups[groups.length-1];
+    if(last&&Math.abs(r-last.r)<THRESH) last.count++;
+    else groups.push({r,count:1});
+  }
+  const factors = groups.map(({r,count})=>{
+    const base=latexFactor(r);
+    return count===1 ? base : `${base}^{${count}}`;
+  }).join('\\,');
+
+  const av = fmtNum(Math.abs(scale));
+  if(scale === 0)  return `0 \\cdot ${factors}`;
+  if(scale === 1)  return factors;
+  if(scale === -1) return `-${factors}`;
+  if(scale > 0)    return `${av}\\,${factors}`;
+  /* scale < 0 */  return `-${av}\\,${factors}`;
+}
+
+// LaTeX for a single term in expanded form
+function latexCoeff(c, deg, isFirst){
+  const raw = Math.round(c*1000)/1000;
+  if(Math.abs(raw)<1e-9) return'';
+  const neg = raw<0;
+  const abs = Math.abs(raw);
+  const numStr = abs===1&&deg>0 ? '' : fmtNum(abs);
+  const varPart = deg===0?'' : deg===1?'x' : `x^{${deg}}`;
+  return isFirst ? `${neg?'-':''}${numStr}${varPart}`
+                 : `${neg?' - ':' + '}${numStr}${varPart}`;
+}
+
+// Full expanded standard form, coefficients already multiplied by scale
+function latexStandard(rs){
+  if(scale === 0) return '0';
+  const coeffs = expandPoly(rs).map(c => scale*c);
+  const n = coeffs.length-1;
+  const parts=[];
+  for(let i=0;i<=n;i++){
+    const p=latexCoeff(coeffs[i],n-i,i===0);
+    if(p) parts.push(p);
+  }
+  return parts.length ? parts.join('') : '0';
+}
+
+function buildLatex(){
+  const sr = sortedRoots();
+  const factored = latexFactored(sr);
+  const standard = latexStandard(sr);
+  const rel = coeffsAreExact(sr) ? '=' : '\\approx';
+  return `\\(\\begin{aligned} f(x) &= ${factored} \\\\ &${rel} ${standard} \\end{aligned}\\)`;
+}
+
+let renderPending = false;
+function updateDisplay(){
+  if(!mathJaxReady) return;
+  const el = document.getElementById('math-output');
+  el.innerHTML = buildLatex();
+  if(renderPending) return;
+  renderPending = true;
+  MathJax.typesetPromise([el]).then(()=>{ renderPending=false; });
+}
+
+// ── scale slider ──────────────────────────────────────────────────
+const slider   = document.getElementById('scale-slider');
+const scaleVal = document.getElementById('scale-val');
+
+slider.addEventListener('input', () => {
+  scale = Math.round(parseFloat(slider.value)*10)/10;
+  scaleVal.textContent = fmtNum(scale);
+  draw(); updateDisplay();
+});
+
+// ── canvas interaction ────────────────────────────────────────────
+function resizeCanvas(){ setCanvasSize(); draw(); }
+
+let panning = null;   // math-space anchor while panning
+
+function hitTest(cx,cy){
+  const[,ry]=toCanvas(0,0);
+  for(let i=roots.length-1;i>=0;i--){
+    const[rx]=toCanvas(roots[i],0), dx=cx-rx, dy=cy-ry;
+    if(dx*dx+dy*dy<14*14) return i;
+  }
+  return -1;
+}
+
+function getPos(e){
+  const r=canvas.getBoundingClientRect(), s=canvas.width/r.width;
+  if(e.touches) return[(e.touches[0].clientX-r.left)*s,(e.touches[0].clientY-r.top)*s];
+  return[(e.clientX-r.left)*s,(e.clientY-r.top)*s];
+}
+
+canvas.addEventListener('mousedown',e=>{
+  const[cx,cy]=getPos(e), idx=hitTest(cx,cy);
+  if(idx>=0){
+    dragging=idx; dragOffsetX=cx-toCanvas(roots[idx],0)[0];
+    canvas.style.cursor='grabbing';
+  } else {
+    panning={ mx: xMin+(cx/canvas.width)*(xMax-xMin),
+              my: yMin+(1-cy/canvas.height)*(yMax-yMin) };
+    canvas.style.cursor='move';
+  }
+});
+canvas.addEventListener('mousemove',e=>{
+  const[cx,cy]=getPos(e);
+  if(dragging!==null){
+    let nx=Math.round(fromCanvas(cx-dragOffsetX)*10)/10;
+    nx=Math.max(xMin,Math.min(xMax,nx));
+    roots[dragging]=nx; draw(); updateDisplay();
+  } else if(panning){
+    const mx=xMin+(cx/canvas.width)*(xMax-xMin);
+    const my=yMin+(1-cy/canvas.height)*(yMax-yMin);
+    xMin+=panning.mx-mx; xMax+=panning.mx-mx;
+    yMin+=panning.my-my; yMax+=panning.my-my;
+    draw();
+  } else {
+    canvas.style.cursor=hitTest(cx,cy)>=0?'grab':'default';
+  }
+});
+function stopDrag(){ dragging=null; panning=null; canvas.style.cursor='default'; }
+canvas.addEventListener('mouseup',stopDrag);
+canvas.addEventListener('mouseleave',stopDrag);
+
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  const[cx,cy]=getPos(e), idx=hitTest(cx,cy);
+  if(idx>=0){
+    dragging=idx; dragOffsetX=cx-toCanvas(roots[idx],0)[0];
+  } else {
+    panning={ mx: xMin+(cx/canvas.width)*(xMax-xMin),
+              my: yMin+(1-cy/canvas.height)*(yMax-yMin) };
+  }
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  const[cx,cy]=getPos(e);
+  if(dragging!==null){
+    let nx=Math.round(fromCanvas(cx-dragOffsetX)*10)/10;
+    nx=Math.max(xMin,Math.min(xMax,nx));
+    roots[dragging]=nx; draw(); updateDisplay();
+  } else if(panning){
+    const mx=xMin+(cx/canvas.width)*(xMax-xMin);
+    const my=yMin+(1-cy/canvas.height)*(yMax-yMin);
+    xMin+=panning.mx-mx; xMax+=panning.mx-mx;
+    yMin+=panning.my-my; yMax+=panning.my-my;
+    draw();
+  }
+},{passive:false});
+canvas.addEventListener('touchend',stopDrag);
+
+// scroll to zoom, centered on mouse position
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const factor=e.deltaY>0?1.15:1/1.15;
+  const[cpx,cpy]=getPos(e);
+  const mouseX=xMin+(cpx/canvas.width)*(xMax-xMin);
+  const mouseY=yMin+(1-cpy/canvas.height)*(yMax-yMin);
+  xMin=mouseX+(xMin-mouseX)*factor; xMax=mouseX+(xMax-mouseX)*factor;
+  yMin=mouseY+(yMin-mouseY)*factor; yMax=mouseY+(yMax-mouseY)*factor;
+  draw();
+},{passive:false});
+
+// double-click to reset view
+canvas.addEventListener('dblclick',()=>{
+  xMin=XMIN0; xMax=XMAX0; yMin=YMIN0; yMax=YMAX0;
+  draw();
+});
+
+// ── degree buttons ────────────────────────────────────────────────
+const db=document.getElementById('deg-btns');
+[1,2,3,4,5,6,7].forEach(d=>{
+  const btn=document.createElement('button');
+  btn.className='deg-btn'+(d===degree?' active':'');
+  btn.textContent=d;
+  btn.addEventListener('click',()=>{
+    degree=d;
+    roots=[...DEFAULT_ROOTS[d]];
+    document.querySelectorAll('.deg-btn').forEach((b,j)=>b.classList.toggle('active',j+1===d));
+    draw(); updateDisplay();
+  });
+  db.appendChild(btn);
+});
+
+window.addEventListener('resize',resizeCanvas);
+resizeCanvas();
+// updateDisplay fires once MathJax is ready (see top of script)
+</script>
+</body>
+</html>

@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rational Root / Asymptote Explorer</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['\\(','\\)']] },
+  options: { skipHtmlTags: ['script','noscript','style','textarea'] },
+  startup: { typeset: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, sans-serif;
+  color: #111;
+  background: #fff;
+  padding: 1.5rem;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
+
+/* ── scaling slider ── */
+#scale-row {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 0.85rem;
+}
+#scale-row label { font-size: 13px; color: #666; white-space: nowrap; }
+#scale-val { font-size: 13px; font-weight: 500; min-width: 3.5ch; text-align: right; }
+
+#scale-slider {
+  flex: 1;
+  -webkit-appearance: none; appearance: none;
+  height: 2px; background: #ccc; border-radius: 1px;
+  outline: none; cursor: pointer;
+}
+#scale-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #185FA5; border: none; cursor: pointer;
+}
+#scale-slider::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #185FA5; border: none; cursor: pointer;
+}
+#scale-slider::-moz-range-progress { background: transparent; }
+
+/* ── legend ── */
+#legend {
+  display: flex; flex-direction: column; gap: 5px;
+  margin-top: 0.75rem;
+  font-size: 12px; color: #666;
+}
+#legend-dots { display: flex; gap: 18px; align-items: center; }
+#legend-hint { font-size: 11px; color: #999; }
+.legend-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  display: inline-block; flex-shrink: 0;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; }
+
+/* ── context menu ── */
+#ctx-menu {
+  position: fixed;
+  background: #fff;
+  border: 0.5px solid #ccc;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 4px 0;
+  z-index: 1000;
+  min-width: 170px;
+  display: none;
+}
+#ctx-menu button {
+  display: block; width: 100%;
+  padding: 7px 14px;
+  background: none; border: none;
+  text-align: left; cursor: pointer;
+  font-size: 13px; color: #111;
+}
+#ctx-menu button:hover { background: #f0f0f0; }
+#ctx-menu hr { border: none; border-top: 0.5px solid #e0e0e0; margin: 3px 0; }
+
+@media (prefers-color-scheme: dark) {
+  #ctx-menu { background: #2a2a2a; border-color: #444; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+  #ctx-menu button { color: #eee; }
+  #ctx-menu button:hover { background: #383838; }
+  #ctx-menu hr { border-color: #444; }
+}
+
+/* ── equation display ── */
+#poly-display {
+  margin-top: 0.85rem;
+  padding: 0.85rem 1.1rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+  border: 0.5px solid #ddd;
+  min-height: 5rem;
+  display: flex;
+  align-items: center;
+}
+#poly-display mjx-container { font-size: 115% !important; }
+
+@media (prefers-color-scheme: dark) {
+  body { background: #1a1a1a; color: #eee; }
+  #degree-row span, #scale-row label, #legend, #legend-hint { color: #999; }
+  #poly-display { background: #242424; border-color: #333; color: #eee; }
+  #scale-slider { background: #444; }
+  #scale-slider::-webkit-slider-thumb { background: #85B7EB; }
+  #scale-slider::-moz-range-thumb    { background: #85B7EB; }
+}
+</style>
+</head>
+<body>
+
+<div id="canvas-wrap">
+  <canvas id="plot"></canvas>
+</div>
+
+<div id="scale-row">
+  <label for="scale-slider">scale <i>a</i></label>
+  <input type="range" id="scale-slider" min="-2" max="2" step="0.1" value="1">
+  <span id="scale-val">1</span>
+</div>
+
+<div id="legend">
+  <div id="legend-dots">
+    <div class="legend-item">
+      <span class="legend-dot" style="background:#E24B4A;border:1.5px solid #A32D2D;"></span>
+      <span>numerator roots (drag <em>to move</em>)</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot" style="background:#9B59B6;border:1.5px solid #6C3483;"></span>
+      <span>denominator roots / asymptotes (drag <em>to move</em>)</span>
+    </div>
+  </div>
+  <div id="legend-hint">Right-click the x-axis to add, remove, or duplicate roots / asymptotes</div>
+</div>
+
+<div id="ctx-menu">
+  <button id="ctx-add-root">Add root here</button>
+  <button id="ctx-add-asymp">Add asymptote here</button>
+  <hr id="ctx-hr">
+  <button id="ctx-dup-root">Duplicate root</button>
+  <button id="ctx-rem-root">Remove root</button>
+  <button id="ctx-dup-asymp">Duplicate asymptote</button>
+  <button id="ctx-rem-asymp">Remove asymptote</button>
+</div>
+
+<div id="poly-display">
+  <div id="math-output"></div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────
+//  CONFIG — tweak here when adding degree selection later
+// ─────────────────────────────────────────────────────────────────
+let xMin = -5, xMax = 5, yMin = -10, yMax = 10;
+const HOLE_THRESH = 0.05;   // distance within which roots are considered shared
+
+let numRoots = [-1.5, 1.5];   // numerator roots
+let denRoots = [-0.5, 2.5];   // denominator roots (asymptotes)
+let scale = 1;
+
+let dragging = null;   // { kind: 'num'|'den', idx, offsetX }
+let panning  = null;   // { mx, my } — math-space anchor on mousedown
+let mathJaxReady = false;
+
+// ─────────────────────────────────────────────────────────────────
+//  CANVAS SETUP
+// ─────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('plot');
+const ctx    = canvas.getContext('2d');
+
+function setCanvasSize(){
+  const W = document.getElementById('canvas-wrap').clientWidth;
+  canvas.width  = W;
+  canvas.height = Math.round(W * 3/4);
+}
+
+function toCanvas(x, y){
+  const W = canvas.width, H = canvas.height;
+  return [(x - xMin) / (xMax - xMin) * W,
+          (1 - (y - yMin) / (yMax - yMin)) * H];
+}
+function fromCanvas(px){ return xMin + px / canvas.width * (xMax - xMin); }
+
+// ─────────────────────────────────────────────────────────────────
+//  COLORS
+// ─────────────────────────────────────────────────────────────────
+function getColors(){
+  const d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return {
+    axis:    d ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.15)',
+    grid:    d ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+    curve:   d ? '#85B7EB' : '#185FA5',
+    numRoot: d ? '#F09595' : '#E24B4A',
+    numRootS:d ? '#E24B4A' : '#A32D2D',
+    denRoot: d ? '#C39BDB' : '#9B59B6',
+    denRootS:d ? '#9B59B6' : '#6C3483',
+    asymp:   d ? 'rgba(180,130,220,0.55)' : 'rgba(130,60,180,0.45)',
+    hole:    d ? '#85B7EB' : '#185FA5',
+    text:    d ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)',
+    bg:      d ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)'
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  HOLE / CANCELLATION LOGIC
+// ─────────────────────────────────────────────────────────────────
+// Returns array of { x, order } for points where cancellation occurs
+// (numerator order >= denominator order at that x).
+// Also returns reduced root arrays for plotting purposes.
+function analyzeRoots(){
+  const holes = [];     // x values with removable discontinuities
+  const asymps = [];    // x values that remain true asymptotes
+
+  // Count multiplicities
+  const numCounts = countMultiplicities(numRoots);
+  const denCounts = countMultiplicities(denRoots);
+
+  // For each denominator root group, check if cancelled by numerator
+  for(const [xStr, denMult] of denCounts.entries()){
+    const x = parseFloat(xStr);
+    const numMult = numCounts.get(xStr) || 0;
+    if(numMult >= denMult){
+      holes.push(x);
+    } else {
+      asymps.push(x);
+    }
+  }
+  return { holes, asymps };
+}
+
+function countMultiplicities(roots){
+  const map = new Map();
+  for(const r of roots){
+    // find key within threshold
+    let found = null;
+    for(const k of map.keys()){
+      if(Math.abs(parseFloat(k) - r) < HOLE_THRESH){ found = k; break; }
+    }
+    if(found !== null) map.set(found, map.get(found) + 1);
+    else map.set(String(Math.round(r * 1000)/1000), 1);
+  }
+  return map;
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  EVALUATE RATIONAL FUNCTION
+// ─────────────────────────────────────────────────────────────────
+function evalRational(x){
+  let num = scale;
+  for(const r of numRoots) num *= (x - r);
+  let den = 1;
+  for(const r of denRoots) den *= (x - r);
+  return num / den;
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  DRAW
+// ─────────────────────────────────────────────────────────────────
+function draw(){
+  const W = canvas.width, H = canvas.height, C = getColors();
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+
+  // adaptive tick spacing — aim for ~6-8 ticks across each axis
+  function niceTick(span){
+    const rough = span / 7;
+    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    for(const mult of [1, 2, 5, 10]){
+      if(mag * mult >= rough) return mag * mult;
+    }
+    return mag * 10;
+  }
+  const xTick = niceTick(xMax - xMin);
+  const yTick = niceTick(yMax - yMin);
+  const xStart = Math.ceil(xMin / xTick) * xTick;
+  const yStart = Math.ceil(yMin / yTick) * yTick;
+
+  // grid
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 0.5;
+  for(let x = xStart; x <= xMax + 1e-9; x += xTick){
+    const [px] = toCanvas(x, 0);
+    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke();
+  }
+  for(let y = yStart; y <= yMax + 1e-9; y += yTick){
+    const [, py] = toCanvas(0, y);
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(W, py); ctx.stroke();
+  }
+
+  // axes
+  const [ox, oy] = toCanvas(0, 0);
+  ctx.strokeStyle = C.axis; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(toCanvas(xMin,0)[0], oy); ctx.lineTo(toCanvas(xMax,0)[0], oy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ox, toCanvas(0,yMin)[1]); ctx.lineTo(ox, toCanvas(0,yMax)[1]); ctx.stroke();
+
+  // axis labels
+  ctx.fillStyle = C.text; ctx.font = '14px system-ui,sans-serif';
+  const fmt = v => Math.abs(v) < 1e-9 ? '' : (Number.isInteger(Math.round(v*100)/100) ? String(Math.round(v)) : v.toPrecision(3).replace(/\.?0+$/, ''));
+  ctx.textAlign = 'center';
+  for(let x = xStart; x <= xMax + 1e-9; x += xTick){
+    if(Math.abs(x) < xTick * 0.01) continue;
+    const [px] = toCanvas(x, 0);
+    ctx.fillText(fmt(x), px, oy + 16);
+  }
+  ctx.textAlign = 'right';
+  for(let y = yStart; y <= yMax + 1e-9; y += yTick){
+    if(Math.abs(y) < yTick * 0.01) continue;
+    const [, py] = toCanvas(0, y);
+    ctx.fillText(fmt(y), ox - 6, py + 5);
+  }
+
+  const { holes, asymps } = analyzeRoots();
+  const allAsympX = [...asymps, ...holes]; // draw dashed line for both
+
+  // asymptote dashed lines (for all denominator roots)
+  ctx.setLineDash([6, 4]);
+  ctx.strokeStyle = C.asymp; ctx.lineWidth = 3;
+  for(const ax of allAsympX){
+    const [px] = toCanvas(ax, 0);
+    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // ── curve ──────────────────────────────────────────────────────
+  // Plot each continuous interval separately, using the known asymptote
+  // positions to define interval boundaries. No heuristics needed —
+  // we simply never sample across a pole.
+  //
+  // Intervals: (-∞, p1), (p1, p2), ..., (pN, +∞)  clipped to [xMin, xMax]
+  // Holes get a tiny skip window so the open circle renders cleanly.
+
+  const POLE_MARGIN = 1e-6;   // stay this far from a true pole when sampling
+  const HOLE_EPS    = 1e-3;   // skip window half-width around removable holes
+  const STEPS_PER_PX = 3;     // samples per canvas pixel
+
+  // Build sorted list of true pole x-values (asymptotes only, not holes)
+  const poleXs = [...asymps].sort((a, b) => a - b);
+
+  // Build interval list: [xLeft, xRight] pairs, staying POLE_MARGIN inside poles
+  const intervalBounds = [];
+  let left = xMin;
+  for(const px of poleXs){
+    if(px > xMin && px < xMax){
+      intervalBounds.push([left, px - POLE_MARGIN]);
+      left = px + POLE_MARGIN;
+    }
+  }
+  intervalBounds.push([left, xMax]);
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+  ctx.strokeStyle = C.curve; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+
+  function plotInterval(xL, xR){
+    const pixelWidth = (xR - xL) / (xMax - xMin) * W;
+    const steps = Math.max(4, Math.ceil(pixelWidth * STEPS_PER_PX));
+    const dx = (xR - xL) / steps;
+    let penDown = false;
+
+    for(let i = 0; i <= steps; i++){
+      const x = xL + i * dx;
+
+      // Skip tiny window around hole positions
+      let nearHole = false;
+      for(const hx of holes){
+        if(Math.abs(x - hx) < HOLE_EPS){ nearHole = true; break; }
+      }
+      if(nearHole){
+        if(penDown){ ctx.stroke(); penDown = false; }
+        continue;
+      }
+
+      const y = evalRational(x);
+      if(!isFinite(y)){
+        if(penDown){ ctx.stroke(); penDown = false; }
+        continue;
+      }
+
+      const [cpx, cpy] = toCanvas(x, y);
+      if(!penDown){ ctx.beginPath(); ctx.moveTo(cpx, cpy); penDown = true; }
+      else { ctx.lineTo(cpx, cpy); }
+    }
+    if(penDown) ctx.stroke();
+  }
+
+  for(const [xL, xR] of intervalBounds) plotInterval(xL, xR);
+
+  ctx.restore();
+
+  // ── dots on x-axis ──────────────────────────────────────────────
+  // Draw order matches drag priority: the dot that would be dragged
+  // is drawn on top. At overlapping positions: purple on top if true
+  // asymptote (den > num), red on top for hole or standalone root.
+  const [, ry] = toCanvas(0, 0);
+
+  // Two dots are "co-located" if their canvas x positions are within this many pixels
+  const OVERLAP_PX = 4;
+
+  function drawDot(canvasX, fill, stroke){
+    ctx.beginPath(); ctx.arc(canvasX, ry, 8, 0, 2 * Math.PI);
+    ctx.fillStyle = fill; ctx.fill();
+    ctx.strokeStyle = stroke; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+
+  const denDrawn = new Array(denRoots.length).fill(false);
+  const numDrawn = new Array(numRoots.length).fill(false);
+
+  // First pass: overlapping pairs — draw bottom dot first, top dot second
+  for(let di = 0; di < denRoots.length; di++){
+    for(let ni = 0; ni < numRoots.length; ni++){
+      const [dCanvasX] = toCanvas(denRoots[di], 0);
+      const [nCanvasX] = toCanvas(numRoots[ni], 0);
+      if(Math.abs(dCanvasX - nCanvasX) < OVERLAP_PX){
+        const isAsymp = asymps.some(a => Math.abs(a - denRoots[di]) < HOLE_THRESH * 2);
+        if(isAsymp){
+          // purple on top: red underneath
+          drawDot(nCanvasX, C.numRoot, C.numRootS);
+          drawDot(dCanvasX, C.denRoot, C.denRootS);
+        } else {
+          // red on top: purple underneath
+          drawDot(dCanvasX, C.denRoot, C.denRootS);
+          drawDot(nCanvasX, C.numRoot, C.numRootS);
+        }
+        denDrawn[di] = true;
+        numDrawn[ni] = true;
+      }
+    }
+  }
+
+  // Second pass: non-overlapping dots, draw order doesn't matter
+  for(let di = 0; di < denRoots.length; di++){
+    if(!denDrawn[di]){
+      const [rx] = toCanvas(denRoots[di], 0);
+      drawDot(rx, C.denRoot, C.denRootS);
+    }
+  }
+  for(let ni = 0; ni < numRoots.length; ni++){
+    if(!numDrawn[ni]){
+      const [rx] = toCanvas(numRoots[ni], 0);
+      drawDot(rx, C.numRoot, C.numRootS);
+    }
+  }
+
+  // ── hole circles (open circles on the curve) ──
+  for(const hx of holes){
+    // y-value of the reduced function at hx (limit)
+    const holeY = limitAtHole(hx);
+    if(isFinite(holeY) && holeY >= yMin && holeY <= yMax){
+      const [hpx, hpy] = toCanvas(hx, holeY);
+      ctx.beginPath(); ctx.arc(hpx, hpy, 6, 0, 2 * Math.PI);
+      ctx.strokeStyle = C.hole; ctx.lineWidth = 2.5;
+      ctx.fillStyle = getBodyBg(); ctx.fill(); ctx.stroke();
+    }
+  }
+}
+
+function getBodyBg(){
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? '#1a1a1a' : '#fff';
+}
+
+// Approximate the removable discontinuity value by evaluating nearby
+function limitAtHole(hx){
+  const eps = 1e-5;
+  const y1 = evalRational(hx + eps);
+  const y2 = evalRational(hx - eps);
+  if(isFinite(y1) && isFinite(y2)) return (y1 + y2) / 2;
+  if(isFinite(y1)) return y1;
+  if(isFinite(y2)) return y2;
+  return NaN;
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  MATHJAX DISPLAY
+// ─────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  MathJax.startup.promise.then(() => {
+    mathJaxReady = true;
+    updateDisplay();
+  });
+});
+
+function isNice(v){ return Math.abs(v - Math.round(v * 10) / 10) < 1e-9; }
+function fmtNum(v){
+  const r = Math.round(v * 10) / 10;
+  if(Number.isInteger(r)) return String(Math.round(r));
+  return r.toFixed(1);
+}
+
+function latexFactor(r){
+  const v = Math.round(r * 10) / 10;
+  if(Math.abs(v) < 1e-9) return 'x';
+  const av = fmtNum(Math.abs(v));
+  return v > 0 ? `(x - ${av})` : `(x + ${av})`;
+}
+
+function latexFactorGroup(roots){
+  const THRESH = 0.05;
+  const groups = [];
+  const sorted = [...roots].sort((a,b) => a - b);
+  for(const r of sorted){
+    const last = groups[groups.length - 1];
+    if(last && Math.abs(r - last.r) < THRESH) last.count++;
+    else groups.push({ r, count: 1 });
+  }
+  return groups.map(({ r, count }) => {
+    const base = latexFactor(r);
+    return count === 1 ? base : `${base}^{${count}}`;
+  }).join('\\,');
+}
+
+// Expand (x-r1)(x-r2)... into coefficient array [leading, ..., constant]
+function expandPoly(rs){
+  let c = [1];
+  for(const r of rs){
+    const n = new Array(c.length + 1).fill(0);
+    for(let i = 0; i < c.length; i++){ n[i] += c[i]; n[i+1] -= r * c[i]; }
+    c = n;
+  }
+  return c;  // coefficients of x^n, x^(n-1), ..., x^0
+}
+
+function latexCoeff(c, deg, isFirst){
+  const raw = Math.round(c * 1000) / 1000;
+  if(Math.abs(raw) < 1e-9) return '';
+  const neg = raw < 0;
+  const abs = Math.abs(raw);
+  const numStr = (abs === 1 && deg > 0) ? '' : fmtNum(abs);
+  const varPart = deg === 0 ? '' : deg === 1 ? 'x' : `x^{${deg}}`;
+  return isFirst ? `${neg ? '-' : ''}${numStr}${varPart}`
+                 : `${neg ? ' - ' : ' + '}${numStr}${varPart}`;
+}
+
+function latexExpanded(roots){
+  const coeffs = expandPoly(roots);
+  const n = coeffs.length - 1;
+  const parts = [];
+  for(let i = 0; i <= n; i++){
+    const p = latexCoeff(coeffs[i], n - i, i === 0);
+    if(p) parts.push(p);
+  }
+  return parts.length ? parts.join('') : '0';
+}
+
+function buildLatex(){
+  const av = fmtNum(Math.abs(scale));
+  let aStr = '';
+  if(scale === 0)       aStr = '0';
+  else if(scale === 1)  aStr = '';
+  else if(scale === -1) aStr = '-';
+  else if(scale > 0)    aStr = av + '\\,';
+  else                  aStr = '-' + av + '\\,';
+
+  if(scale === 0) return `\\(\\begin{aligned} f(x) &= 0 \\end{aligned}\\)`;
+
+  const numFactored  = latexFactorGroup(numRoots);
+  const denFactored  = latexFactorGroup(denRoots);
+  const numExpanded  = latexExpanded(numRoots);
+  const denExpanded  = latexExpanded(denRoots);
+
+  // Only show the expanded line if it differs from the factored form
+  const numSame = numRoots.length === 1;
+  const denSame = denRoots.length === 1;
+  const showExpanded = !numSame || !denSame;
+
+  const line1 = `f(x) &= ${aStr}\\dfrac{${numFactored}}{${denFactored}}`;
+  const line2 = showExpanded
+    ? `&= ${aStr}\\dfrac{${numExpanded}}{${denExpanded}}`
+    : '';
+
+  return showExpanded
+    ? `\\(\\begin{aligned} ${line1} \\\\ ${line2} \\end{aligned}\\)`
+    : `\\(\\begin{aligned} ${line1} \\end{aligned}\\)`;
+}
+
+let renderPending = false;
+function updateDisplay(){
+  if(!mathJaxReady) return;
+  const el = document.getElementById('math-output');
+  el.innerHTML = buildLatex();
+  if(renderPending) return;
+  renderPending = true;
+  MathJax.typesetPromise([el]).then(() => { renderPending = false; });
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  SCALE SLIDER
+// ─────────────────────────────────────────────────────────────────
+const slider   = document.getElementById('scale-slider');
+const scaleVal = document.getElementById('scale-val');
+slider.addEventListener('input', () => {
+  scale = Math.round(parseFloat(slider.value) * 10) / 10;
+  scaleVal.textContent = fmtNum(scale);
+  draw(); updateDisplay();
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  HIT TESTING & DRAGGING
+// ─────────────────────────────────────────────────────────────────
+function hitTest(cx, cy){
+  const [, ry] = toCanvas(0, 0);
+  const { holes, asymps } = analyzeRoots();
+
+  // At a given canvas x, determine which dot type is visually on top:
+  // - pure asymptote (den > num): purple on top → test den first
+  // - hole or pure root (num >= den): red on top → test num first
+  // We do one unified pass checking both lists, preferring the top dot.
+
+  let bestHit = null, bestDist = 14 * 14;
+
+  function check(kind, roots){
+    for(let i = roots.length - 1; i >= 0; i--){
+      const [rx] = toCanvas(roots[i], 0), dx = cx - rx, dy = cy - ry;
+      const d2 = dx*dx + dy*dy;
+      if(d2 < bestDist){ bestDist = d2; bestHit = { kind, idx: i }; }
+    }
+  }
+
+  // Check both lists for closest hit within radius.
+  // Then, if two dots are nearly co-located, let draw-order decide:
+  // re-test the winner against the other list at the same position.
+  check('num', numRoots);
+  check('den', denRoots);
+
+  // If we hit something, check if there's an overlapping dot of the other type.
+  // If so, the one drawn on top (den when it's a true asymptote, num otherwise) wins.
+  if(bestHit){
+    const winnerX = bestHit.kind === 'num' ? numRoots[bestHit.idx] : denRoots[bestHit.idx];
+    const otherRoots = bestHit.kind === 'num' ? denRoots : numRoots;
+    const otherKind  = bestHit.kind === 'num' ? 'den' : 'num';
+    for(let i = otherRoots.length - 1; i >= 0; i--){
+      if(Math.abs(otherRoots[i] - winnerX) < HOLE_THRESH * 2){
+        // There's an overlapping dot — decide by visual order
+        const isAsymp = asymps.some(a => Math.abs(a - winnerX) < HOLE_THRESH * 2);
+        // If it's a true asymptote, den is on top; otherwise num is on top
+        const topKind = isAsymp ? 'den' : 'num';
+        if(topKind !== bestHit.kind) bestHit = { kind: otherKind, idx: i };
+        break;
+      }
+    }
+  }
+
+  return bestHit;
+}
+
+function getPos(e){
+  const r = canvas.getBoundingClientRect(), s = canvas.width / r.width;
+  if(e.touches) return [(e.touches[0].clientX - r.left) * s, (e.touches[0].clientY - r.top) * s];
+  return [(e.clientX - r.left) * s, (e.clientY - r.top) * s];
+}
+
+function getRootX(hit){ return hit.kind === 'num' ? numRoots[hit.idx] : denRoots[hit.idx]; }
+function setRootX(hit, x){ if(hit.kind === 'num') numRoots[hit.idx] = x; else denRoots[hit.idx] = x; }
+
+canvas.addEventListener('mousedown', e => {
+  const [cx, cy] = getPos(e), hit = hitTest(cx, cy);
+  if(hit){
+    dragging = { ...hit, offsetX: cx - toCanvas(getRootX(hit), 0)[0] };
+    canvas.style.cursor = 'grabbing';
+  } else {
+    // Start panning — record the math-space anchor point
+    const mx = xMin + (cx / canvas.width)  * (xMax - xMin);
+    const my = yMin + (1 - cy / canvas.height) * (yMax - yMin);
+    panning = { mx, my };
+    canvas.style.cursor = 'move';
+  }
+});
+canvas.addEventListener('mousemove', e => {
+  const [cx, cy] = getPos(e);
+  if(dragging){
+    let nx = Math.round(fromCanvas(cx - dragging.offsetX) * 10) / 10;
+    nx = Math.max(xMin, Math.min(xMax, nx));
+    setRootX(dragging, nx);
+    draw(); updateDisplay();
+  } else if(panning){
+    // Shift the view so the anchor point stays under the mouse
+    const mx = xMin + (cx / canvas.width)  * (xMax - xMin);
+    const my = yMin + (1 - cy / canvas.height) * (yMax - yMin);
+    const dx = panning.mx - mx;
+    const dy = panning.my - my;
+    xMin += dx; xMax += dx;
+    yMin += dy; yMax += dy;
+    draw();
+  } else {
+    const hit = hitTest(cx, cy);
+    canvas.style.cursor = hit ? 'grab' : 'default';
+  }
+});
+function stopDrag(){
+  dragging = null; panning = null;
+  canvas.style.cursor = 'default';
+}
+canvas.addEventListener('mouseup', stopDrag);
+canvas.addEventListener('mouseleave', stopDrag);
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const [cx, cy] = getPos(e), hit = hitTest(cx, cy);
+  if(hit){
+    dragging = { ...hit, offsetX: cx - toCanvas(getRootX(hit), 0)[0] };
+  } else {
+    const mx = xMin + (cx / canvas.width)  * (xMax - xMin);
+    const my = yMin + (1 - cy / canvas.height) * (yMax - yMin);
+    panning = { mx, my };
+  }
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const [cx, cy] = getPos(e);
+  if(dragging){
+    let nx = Math.round(fromCanvas(cx - dragging.offsetX) * 10) / 10;
+    nx = Math.max(xMin, Math.min(xMax, nx));
+    setRootX(dragging, nx);
+    draw(); updateDisplay();
+  } else if(panning){
+    const mx = xMin + (cx / canvas.width)  * (xMax - xMin);
+    const my = yMin + (1 - cy / canvas.height) * (yMax - yMin);
+    const dx = panning.mx - mx;
+    const dy = panning.my - my;
+    xMin += dx; xMax += dx;
+    yMin += dy; yMax += dy;
+    draw();
+  }
+}, { passive: false });
+canvas.addEventListener('touchend', stopDrag);
+
+// ─────────────────────────────────────────────────────────────────
+//  CONTEXT MENU
+// ─────────────────────────────────────────────────────────────────
+const ctxMenu     = document.getElementById('ctx-menu');
+const ctxAddRoot  = document.getElementById('ctx-add-root');
+const ctxAddAsymp = document.getElementById('ctx-add-asymp');
+const ctxHr       = document.getElementById('ctx-hr');
+const ctxDupRoot  = document.getElementById('ctx-dup-root');
+const ctxRemRoot  = document.getElementById('ctx-rem-root');
+const ctxDupAsymp = document.getElementById('ctx-dup-asymp');
+const ctxRemAsymp = document.getElementById('ctx-rem-asymp');
+
+let ctxState = null;  // { kind: 'axis', mathX } | { kind: 'dot', mathX, numIdx, denIdx }
+
+function showMenu(pageX, pageY){
+  ctxMenu.style.display = 'block';
+  const menuW = 190;
+  const left = (pageX + menuW > window.innerWidth) ? pageX - menuW : pageX;
+  ctxMenu.style.left = left + 'px';
+  ctxMenu.style.top  = pageY + 'px';
+}
+function hideMenu(){ ctxMenu.style.display = 'none'; ctxState = null; }
+
+// Show/hide individual menu items
+function setVisible(el, v){ el.style.display = v ? 'block' : 'none'; }
+
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const [cx, cy] = getPos(e);
+  const [, axisCanvasY] = toCanvas(0, 0);
+  const nearAxis = Math.abs(cy - axisCanvasY) < 18;
+  if(!nearAxis) return;
+
+  const mathX = Math.round((xMin + (cx / canvas.width) * (xMax - xMin)) * 10) / 10;
+
+  // Find all num/den roots within hit radius of this x position
+  const numIdx = numRoots.reduce((best, r, i) => {
+    const [rx] = toCanvas(r, 0);
+    return Math.abs(rx - cx) < 14 && (best === -1 || Math.abs(r - mathX) < Math.abs(numRoots[best] - mathX)) ? i : best;
+  }, -1);
+  const denIdx = denRoots.reduce((best, r, i) => {
+    const [rx] = toCanvas(r, 0);
+    return Math.abs(rx - cx) < 14 && (best === -1 || Math.abs(r - mathX) < Math.abs(denRoots[best] - mathX)) ? i : best;
+  }, -1);
+
+  const onDot = numIdx !== -1 || denIdx !== -1;
+
+  if(onDot){
+    ctxState = { kind: 'dot', mathX, numIdx, denIdx };
+    setVisible(ctxAddRoot,  false);
+    setVisible(ctxAddAsymp, false);
+    setVisible(ctxHr,       false);
+    setVisible(ctxDupRoot,  numIdx !== -1);
+    setVisible(ctxRemRoot,  numIdx !== -1);
+    setVisible(ctxDupAsymp, denIdx !== -1);
+    setVisible(ctxRemAsymp, denIdx !== -1);
+  } else {
+    ctxState = { kind: 'axis', mathX };
+    setVisible(ctxAddRoot,  true);
+    setVisible(ctxAddAsymp, true);
+    setVisible(ctxHr,       false);
+    setVisible(ctxDupRoot,  false);
+    setVisible(ctxRemRoot,  false);
+    setVisible(ctxDupAsymp, false);
+    setVisible(ctxRemAsymp, false);
+  }
+  showMenu(e.pageX, e.pageY);
+});
+
+ctxAddRoot.addEventListener('click', () => {
+  if(!ctxState) return;
+  numRoots.push(ctxState.mathX);
+  hideMenu(); draw(); updateDisplay();
+});
+ctxAddAsymp.addEventListener('click', () => {
+  if(!ctxState) return;
+  denRoots.push(ctxState.mathX);
+  hideMenu(); draw(); updateDisplay();
+});
+ctxDupRoot.addEventListener('click', () => {
+  if(!ctxState || ctxState.numIdx === -1) return;
+  numRoots.push(numRoots[ctxState.numIdx]);  // exact duplicate
+  hideMenu(); draw(); updateDisplay();
+});
+ctxRemRoot.addEventListener('click', () => {
+  if(!ctxState || ctxState.numIdx === -1) return;
+  if(numRoots.length > 1) numRoots.splice(ctxState.numIdx, 1);
+  hideMenu(); draw(); updateDisplay();
+});
+ctxDupAsymp.addEventListener('click', () => {
+  if(!ctxState || ctxState.denIdx === -1) return;
+  denRoots.push(denRoots[ctxState.denIdx]);  // exact duplicate
+  hideMenu(); draw(); updateDisplay();
+});
+ctxRemAsymp.addEventListener('click', () => {
+  if(!ctxState || ctxState.denIdx === -1) return;
+  if(denRoots.length > 1) denRoots.splice(ctxState.denIdx, 1);
+  hideMenu(); draw(); updateDisplay();
+});
+
+// Dismiss on outside click, Escape, or scroll
+document.addEventListener('click', e => { if(!ctxMenu.contains(e.target)) hideMenu(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape') hideMenu(); });
+canvas.addEventListener('wheel', () => hideMenu(), { passive: true });
+
+// ─────────────────────────────────────────────────────────────────
+//  SCROLL ZOOM
+// ─────────────────────────────────────────────────────────────────
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;  // scroll down = zoom out
+
+  // Zoom centered on the mouse position in math coords
+  const [cpx, cpy] = getPos(e);
+  const mouseX = xMin + (cpx / canvas.width)  * (xMax - xMin);
+  const mouseY = yMin + (1 - cpy / canvas.height) * (yMax - yMin);
+
+  xMin = mouseX + (xMin - mouseX) * factor;
+  xMax = mouseX + (xMax - mouseX) * factor;
+  yMin = mouseY + (yMin - mouseY) * factor;
+  yMax = mouseY + (yMax - mouseY) * factor;
+
+  draw();
+}, { passive: false });
+
+// Double-click to reset view
+canvas.addEventListener('dblclick', () => {
+  xMin = -5; xMax = 5; yMin = -10; yMax = 10;
+  draw();
+});
+
+
+function resizeCanvas(){ setCanvasSize(); draw(); }
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+</script>
+</body>
+</html>
