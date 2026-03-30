@@ -504,6 +504,7 @@ function latexFactor(r){
 }
 
 function latexFactorGroup(roots){
+  if(roots.length === 0) return '1';
   const THRESH = 0.05;
   const groups = [];
   const sorted = [...roots].sort((a,b) => a - b);
@@ -819,7 +820,7 @@ ctxDupRoot.addEventListener('click', () => {
 });
 ctxRemRoot.addEventListener('click', () => {
   if(!ctxState || ctxState.numIdx === -1) return;
-  if(numRoots.length > 1) numRoots.splice(ctxState.numIdx, 1);
+  numRoots.splice(ctxState.numIdx, 1);
   hideMenu(); draw(); updateDisplay();
 });
 ctxDupAsymp.addEventListener('click', () => {
@@ -829,7 +830,7 @@ ctxDupAsymp.addEventListener('click', () => {
 });
 ctxRemAsymp.addEventListener('click', () => {
   if(!ctxState || ctxState.denIdx === -1) return;
-  if(denRoots.length > 1) denRoots.splice(ctxState.denIdx, 1);
+  denRoots.splice(ctxState.denIdx, 1);
   hideMenu(); draw(); updateDisplay();
 });
 
