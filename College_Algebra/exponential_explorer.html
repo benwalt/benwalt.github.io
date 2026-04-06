@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exponential Function Explorer</title>
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+
+<style>
+/* ── reset & base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #fff;
+  color: #111;
+  padding: 1.5rem;
+  max-width: 660px;
+  margin: 0 auto;
+}
+
+h2 {
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  flex-wrap: wrap;
+}
+
+/* ── canvas ── */
+canvas {
+  display: block;
+  width: 100%;
+  touch-action: none;
+  border-radius: 8px;
+}
+
+#canvas-wrap { position: relative; }
+
+/* ── zoom overlay ── */
+#zoom-select {
+  position: absolute;
+  top: 8px; left: 8px;
+  display: flex; flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+#zoom-select .zoom-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+  color: rgba(0,0,0,0.45);
+  text-transform: uppercase;
+  margin-bottom: 1px;
+  user-select: none;
+}
+#zoom-select button {
+  width: 36px; height: 30px;
+  border-radius: 5px;
+  border: 1px solid rgba(0,0,0,0.25);
+  background: rgba(255,255,255,0.70);
+  color: rgba(0,0,0,0.7);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.12s;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+#zoom-select button:hover  { background: rgba(255,255,255,0.90); }
+#zoom-select button.active { background: rgba(0,0,0,0.65); border-color: rgba(0,0,0,0.7); color: #fff; }
+
+/* ── slider row ── */
+.slider-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 0.85rem;
+}
+.slider-row .slider-label {
+  font-size: 13px;
+  min-width: 7ch;
+  white-space: nowrap;
+}
+.slider-row input[type=range] {
+  flex: 1;
+  -webkit-appearance: none; appearance: none;
+  height: 2px; background: #ccc; border-radius: 1px;
+  outline: none; cursor: pointer;
+}
+.slider-row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #185FA5; border: none; cursor: pointer;
+}
+.slider-row input[type=range]::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #185FA5; border: none; cursor: pointer;
+}
+
+/* ── notation toggle ── */
+#notation-row {
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px;
+  margin-top: 0.9rem;
+  font-size: 13px;
+}
+#notation-row .tog-label {
+  cursor: pointer;
+  transition: color 0.15s, font-weight 0.15s;
+}
+#notation-row .tog-label.active { font-weight: 700; color: #185FA5; }
+#notation-row .tog-label.inactive { color: #888; }
+
+/* toggle switch */
+#toggle-wrap {
+  position: relative;
+  width: 44px; height: 24px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+#toggle-track {
+  position: absolute; inset: 0;
+  border-radius: 12px;
+  background: #ccc;
+  transition: background 0.2s;
+}
+#toggle-track.on { background: #185FA5; }
+#toggle-thumb {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  transition: left 0.2s;
+}
+#toggle-thumb.on { left: 22px; }
+
+/* ── formula display ── */
+#formula-display {
+  margin-top: 0.85rem;
+  padding: 0.75rem 1.1rem;
+  background: #f6f8fc;
+  border-radius: 8px;
+  border: 1px solid #d8e2f0;
+  min-height: 3.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── legend upper (above formula) ── */
+#legend-upper {
+  display: flex; flex-direction: column; gap: 5px;
+  margin-top: 0.75rem;
+  margin-bottom: 0.6rem;
+  font-size: 12px; color: #666;
+}
+#legend-main { display: flex; align-items: center; gap: 7px; }
+#legend-a    { font-size: 13px; }
+.legend-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  display: inline-block; flex-shrink: 0;
+  background: #E24B4A; border: 1.5px solid #A32D2D;
+}
+#legend-drag-hint { font-size: 12px; color: #777; }
+#legend-behavior  { font-size: 12px; color: #777; }
+
+/* ── legend hint (below canvas) ── */
+#legend-hint {
+  margin-top: 0.55rem;
+  font-size: 11px; color: #777;
+  text-align: center;
+}
+
+/* ── dark mode ── */
+@media (prefers-color-scheme: dark) {
+  body { background: #1a1a1a; color: #eee; }
+
+  h2 { color: #eee; }
+
+  #zoom-select .zoom-label { color: rgba(255,255,255,0.55); }
+  #zoom-select button {
+    border-color: rgba(255,255,255,0.30);
+    background: rgba(0,0,0,0.35);
+    color: rgba(255,255,255,0.85);
+  }
+  #zoom-select button:hover  { background: rgba(0,0,0,0.55); }
+  #zoom-select button.active { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.65); color: #fff; }
+
+  .slider-row input[type=range] { background: #444; }
+  .slider-row input[type=range]::-webkit-slider-thumb { background: #85B7EB; }
+  .slider-row input[type=range]::-moz-range-thumb    { background: #85B7EB; }
+
+  #notation-row .tog-label.inactive { color: #666; }
+  #notation-row .tog-label.active   { color: #85B7EB; }
+  #toggle-track.on { background: #185FA5; }
+
+  #formula-display { background: #242424; border-color: #333; color: #eee; }
+  #formula-display .katex { color: #eee; }
+
+  #legend-upper     { color: #999; }
+  #legend-hint      { color: #888; }
+  #legend-drag-hint { color: #888; }
+  #legend-behavior  { color: #888; }
+  .legend-dot { background: #F09595; border-color: #E24B4A; }
+
+  .slider-row .slider-label { color: #aaa; }
+}
+</style>
+</head>
+<body>
+
+<h2 id="page-title">
+  Exponential Function:&nbsp;<span id="header-math"></span>
+</h2>
+
+<!-- notation toggle -->
+<div id="notation-row">
+  <span id="label-b" class="tog-label active"></span>
+  <div id="toggle-wrap">
+    <div id="toggle-track"></div>
+    <div id="toggle-thumb"></div>
+  </div>
+  <span id="label-r" class="tog-label inactive"></span>
+</div>
+
+<!-- b / r slider -->
+<div class="slider-row">
+  <span class="slider-label" id="br-label"></span>
+  <input type="range" id="br-slider" min="0.25" max="4" step="0.01" value="2">
+</div>
+
+<!-- behavior hint + legend-main (above formula) -->
+<div id="legend-upper">
+  <div id="legend-behavior"></div>
+  <div id="legend-main">
+    <span class="legend-dot"></span>
+    <span id="legend-a"></span>
+    <span id="legend-drag-hint">&nbsp;&nbsp;<i>(drag the red dot up/down to change the initial value, <span id="legend-a-sym"></span>)</i></span>
+  </div>
+</div>
+
+<!-- formula display -->
+<div id="formula-display">
+  <span id="formula-math"></span>
+</div>
+
+<!-- canvas -->
+<div id="canvas-wrap">
+  <canvas id="plot"></canvas>
+  <div id="zoom-select">
+    <div class="zoom-label">Zoom</div>
+    <button id="zoom-xy" class="active" title="Zoom both axes">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="1" y1="8" x2="15" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <polyline points="4,5 1,8 4,11" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+        <polyline points="12,5 15,8 12,11" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+        <line x1="8" y1="1" x2="8" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <polyline points="5,4 8,1 11,4" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+        <polyline points="5,12 8,15 11,12" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </button>
+    <button id="zoom-x" title="Zoom x-axis only">&#x2194;</button>
+    <button id="zoom-y" title="Zoom y-axis only">&#x2195;</button>
+  </div>
+</div>
+
+<!-- hint below canvas -->
+<div id="legend-hint">Scroll to zoom &nbsp;·&nbsp; Drag canvas to pan &nbsp;·&nbsp; Double-click to reset view</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────────────────────────
+let a = 1;         // y-intercept / vertical scale
+let b = 2;         // base (bˣ notation)
+let useRate = false;  // false → b notation, true → r notation
+
+let xMin = -4, xMax = 4, yMin = -6, yMax = 20;
+const DEFAULT_VIEW = { xMin: -4, xMax: 4, yMin: -6, yMax: 20 };
+
+let zoomAxis = 'both';   // 'both' | 'x' | 'y'
+let draggingDot = false;
+let panning = null;      // { mx, my } math-space anchor
+
+const DOT_HIT_RADIUS = 14;
+
+// ─────────────────────────────────────────────────────────────────
+//  CANVAS SETUP
+// ─────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('plot');
+const ctx    = canvas.getContext('2d');
+
+function setCanvasSize() {
+  const W = document.getElementById('canvas-wrap').clientWidth;
+  canvas.width  = W;
+  canvas.height = Math.round(W * 0.65);
+}
+
+// coordinate transforms
+function toCanvas(mx, my) {
+  return [
+    (mx - xMin) / (xMax - xMin) * canvas.width,
+    (1 - (my - yMin) / (yMax - yMin)) * canvas.height,
+  ];
+}
+function mathFromCanvas(cx, cy) {
+  return [
+    xMin + (cx / canvas.width)  * (xMax - xMin),
+    yMin + (1 - cy / canvas.height) * (yMax - yMin),
+  ];
+}
+function mathYFromCanvas(cy) {
+  return yMin + (1 - cy / canvas.height) * (yMax - yMin);
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  COLORS  (dark-mode aware)
+// ─────────────────────────────────────────────────────────────────
+function getColors() {
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return {
+    bg:     dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+    grid:   dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)',
+    axis:   dark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.35)',
+    tick:   dark ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.40)',
+    curve:  dark ? '#85B7EB'                : '#185FA5',
+    dotFill:   dark ? '#F09595' : '#E24B4A',
+    dotStroke: dark ? '#E24B4A' : '#A32D2D',
+    dotGlow:   dark ? 'rgba(240,149,149,0.18)' : 'rgba(226,75,74,0.15)',
+    guide:     dark ? 'rgba(240,149,149,0.30)' : 'rgba(226,75,74,0.35)',
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  ADAPTIVE TICKS
+// ─────────────────────────────────────────────────────────────────
+function niceTick(span) {
+  const rough = span / 7;
+  const mag   = Math.pow(10, Math.floor(Math.log10(rough)));
+  for (const m of [1, 2, 5, 10]) if (mag * m >= rough) return mag * m;
+  return mag * 10;
+}
+function fmtTick(v) {
+  if (Math.abs(v) < 1e-9) return '0';
+  const r = Math.round(v * 100) / 100;
+  return Number.isInteger(r) ? String(Math.round(r)) : r.toPrecision(3).replace(/\.?0+$/, '');
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  DRAW
+// ─────────────────────────────────────────────────────────────────
+function draw() {
+  const W = canvas.width, H = canvas.height;
+  const C = getColors();
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+
+  const xTick  = niceTick(xMax - xMin);
+  const yTick  = niceTick(yMax - yMin);
+  const xStart = Math.ceil(xMin / xTick) * xTick;
+  const yStart = Math.ceil(yMin / yTick) * yTick;
+
+  // grid
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 0.5;
+  for (let x = xStart; x <= xMax + 1e-9; x += xTick) {
+    const [px] = toCanvas(x, 0);
+    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke();
+  }
+  for (let y = yStart; y <= yMax + 1e-9; y += yTick) {
+    const [, py] = toCanvas(0, y);
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(W, py); ctx.stroke();
+  }
+
+  // axes
+  const [ox, oy] = toCanvas(0, 0);
+  ctx.strokeStyle = C.axis; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, oy);  ctx.lineTo(W, oy);  ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ox, 0);  ctx.lineTo(ox, H);  ctx.stroke();
+
+  // tick labels
+  ctx.fillStyle = C.tick; ctx.font = '13px system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  for (let x = xStart; x <= xMax + 1e-9; x += xTick) {
+    if (Math.abs(x) < xTick * 0.01) continue;
+    const [px] = toCanvas(x, 0);
+    ctx.fillText(fmtTick(x), px, Math.min(Math.max(oy + 16, 16), H - 4));
+  }
+  ctx.textAlign = 'right';
+  for (let y = yStart; y <= yMax + 1e-9; y += yTick) {
+    if (Math.abs(y) < yTick * 0.01) continue;
+    const [, py] = toCanvas(0, y);
+    ctx.fillText(fmtTick(y), Math.min(Math.max(ox - 6, 28), W - 4), py + 5);
+  }
+
+  // ── curve ────────────────────────────────────────────────────────
+  const steps = Math.ceil(W * 3);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+  ctx.strokeStyle = C.curve; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  let penDown = false;
+  for (let i = 0; i <= steps; i++) {
+    const mx = xMin + (i / steps) * (xMax - xMin);
+    const my = a * Math.pow(b, mx);
+    if (!isFinite(my)) { if (penDown) { ctx.stroke(); penDown = false; } continue; }
+    const [px, py] = toCanvas(mx, my);
+    if (!penDown) { ctx.beginPath(); ctx.moveTo(px, py); penDown = true; }
+    else ctx.lineTo(px, py);
+  }
+  if (penDown) ctx.stroke();
+  ctx.restore();
+
+  // ── dashed guide on y-axis to dot ────────────────────────────────
+  if (ox >= 0 && ox <= W) {
+    const [, dotPy]  = toCanvas(0, a);
+    const [, zeroPy] = toCanvas(0, 0);
+    ctx.save();
+    ctx.setLineDash([3, 4]);
+    ctx.strokeStyle = C.guide; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(ox, zeroPy); ctx.lineTo(ox, dotPy); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  // ── draggable dot ─────────────────────────────────────────────────
+  if (a >= yMin && a <= yMax) {
+    const [dx, dy] = toCanvas(0, a);
+    ctx.beginPath(); ctx.arc(dx, dy, 12, 0, 2 * Math.PI);
+    ctx.fillStyle = C.dotGlow; ctx.fill();
+    ctx.beginPath(); ctx.arc(dx, dy, 7, 0, 2 * Math.PI);
+    ctx.fillStyle = C.dotFill; ctx.fill();
+    ctx.strokeStyle = C.dotStroke; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  KATEX RENDERING
+// ─────────────────────────────────────────────────────────────────
+function renderKatex(el, tex, display) {
+  katex.render(tex, el, { displayMode: !!display, throwOnError: false });
+}
+
+function fmtLatex(v) {
+  if (Math.abs(v) < 1e-9) return '0';
+  const r = Math.round(v * 100) / 100;
+  if (Number.isInteger(r)) return String(Math.round(r));
+  return r.toFixed(2).replace(/\.?0+$/, '');
+}
+
+function buildFormulaTex() {
+  const aStr = fmtLatex(a);
+  const aFactor = aStr === '1'  ? ''
+                : aStr === '-1' ? '-'
+                : `${aStr} \\cdot `;
+  if (useRate) {
+    const r    = b - 1;
+    const rAbs = fmtLatex(Math.abs(r));
+    const sign = r < 0 ? '-' : '+';
+    return `f(x) = ${aFactor}\\left(1 ${sign} ${rAbs}\\right)^{x}`;
+  } else {
+    return `f(x) = ${aFactor}${fmtLatex(b)}^{x}`;
+  }
+}
+
+function buildHeaderTex() {
+  return useRate ? 'f(x) = a \\cdot (1+r)^{x}' : 'f(x) = a \\cdot b^{x}';
+}
+
+function updateKatex() {
+  renderKatex(document.getElementById('header-math'),  buildHeaderTex(), false);
+  renderKatex(document.getElementById('formula-math'), buildFormulaTex(), true);
+
+  // slider label
+  const r      = b - 1;
+  const brTex  = useRate
+    ? `r = ${r < 0 ? '-' : ''}${fmtLatex(Math.abs(r))}`
+    : `b = ${fmtLatex(b)}`;
+  renderKatex(document.getElementById('br-label'), brTex, false);
+
+  // legend
+  renderKatex(document.getElementById('legend-a'),     `a = ${fmtLatex(a)}`, false);
+  renderKatex(document.getElementById('legend-a-sym'), 'a', false);
+
+  // notation toggle labels
+  renderKatex(document.getElementById('label-b'), 'b\\text{ notation}', false);
+  renderKatex(document.getElementById('label-r'), 'r\\text{ notation}', false);
+
+  // ── behavior hint (single clause for current state, in parentheses) ─
+  const beh = document.getElementById('legend-behavior');
+  beh.innerHTML = '';
+
+  function katexSpan(tex) {
+    const sp = document.createElement('span');
+    renderKatex(sp, tex, false);
+    return sp;
+  }
+
+  const condGrow  = useRate ? 'r > 0'     : 'b > 1';
+  const condConst = useRate ? 'r = 0'     : 'b = 1';
+  const condDecay = useRate ? 'r < 0'     : '0 < b < 1';
+
+  beh.append('(');
+  if (Math.abs(b - 1) < 1e-9) {
+    beh.append('Function is constant when ');
+    beh.append(katexSpan(condConst));
+  } else if (b > 1) {
+    beh.append('Function grows when ');
+    beh.append(katexSpan(condGrow));
+  } else {
+    beh.append('Function decays when ');
+    beh.append(katexSpan(condDecay));
+  }
+  beh.append(')');
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  NOTATION TOGGLE
+// ─────────────────────────────────────────────────────────────────
+const toggleWrap  = document.getElementById('toggle-wrap');
+const toggleTrack = document.getElementById('toggle-track');
+const toggleThumb = document.getElementById('toggle-thumb');
+const labelB      = document.getElementById('label-b');
+const labelR      = document.getElementById('label-r');
+const brSlider    = document.getElementById('br-slider');
+
+function applyToggleState() {
+  toggleTrack.classList.toggle('on', useRate);
+  toggleThumb.classList.toggle('on', useRate);
+  labelB.classList.toggle('active',   !useRate);
+  labelB.classList.toggle('inactive',  useRate);
+  labelR.classList.toggle('active',    useRate);
+  labelR.classList.toggle('inactive', !useRate);
+
+  if (useRate) {
+    const r = b - 1;
+    brSlider.min   = '-0.75';
+    brSlider.max   = '3';
+    brSlider.step  = '0.01';
+    brSlider.value = String(r);
+  } else {
+    brSlider.min   = '0.25';
+    brSlider.max   = '4';
+    brSlider.step  = '0.01';
+    brSlider.value = String(b);
+  }
+}
+
+function toggleNotation() {
+  useRate = !useRate;
+  applyToggleState();
+  updateKatex();
+  draw();
+}
+
+toggleWrap.addEventListener('click', toggleNotation);
+labelB.addEventListener('click', () => { if (useRate)  toggleNotation(); });
+labelR.addEventListener('click', () => { if (!useRate) toggleNotation(); });
+
+brSlider.addEventListener('input', () => {
+  const val = parseFloat(brSlider.value);
+  if (useRate) b = val + 1;
+  else         b = val;
+  updateKatex();
+  draw();
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  DOT HIT TEST
+// ─────────────────────────────────────────────────────────────────
+function dotCanvasPos() {
+  if (a < yMin || a > yMax) return null;
+  return toCanvas(0, a);
+}
+
+function hitTestDot(cx, cy) {
+  const pos = dotCanvasPos();
+  if (!pos) return false;
+  const dx = cx - pos[0], dy = cy - pos[1];
+  return dx * dx + dy * dy <= DOT_HIT_RADIUS * DOT_HIT_RADIUS;
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  POINTER HELPERS
+// ─────────────────────────────────────────────────────────────────
+function getPos(e) {
+  const r = canvas.getBoundingClientRect(), s = canvas.width / r.width;
+  const src = e.touches ? e.touches[0] : e;
+  return [(src.clientX - r.left) * s, (src.clientY - r.top) * s];
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  MOUSE EVENTS
+// ─────────────────────────────────────────────────────────────────
+canvas.addEventListener('mousedown', e => {
+  const [cx, cy] = getPos(e);
+  if (hitTestDot(cx, cy)) {
+    draggingDot = true;
+    canvas.style.cursor = 'grabbing';
+  } else {
+    const [mx, my] = mathFromCanvas(cx, cy);
+    panning = { mx, my };
+    canvas.style.cursor = 'move';
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  const [cx, cy] = getPos(e);
+  if (draggingDot) {
+    a = Math.round(mathYFromCanvas(cy) * 100) / 100;
+    updateKatex();
+    draw();
+  } else if (panning) {
+    const [mx, my] = mathFromCanvas(cx, cy);
+    const dx = panning.mx - mx, dy = panning.my - my;
+    xMin += dx; xMax += dx; yMin += dy; yMax += dy;
+    draw();
+  } else {
+    canvas.style.cursor = hitTestDot(cx, cy) ? 'grab' : 'default';
+  }
+});
+
+function stopInteraction() {
+  draggingDot = false;
+  panning = null;
+  canvas.style.cursor = 'default';
+}
+canvas.addEventListener('mouseup',    stopInteraction);
+canvas.addEventListener('mouseleave', stopInteraction);
+
+// ─────────────────────────────────────────────────────────────────
+//  TOUCH EVENTS
+// ─────────────────────────────────────────────────────────────────
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const [cx, cy] = getPos(e);
+  if (hitTestDot(cx, cy)) {
+    draggingDot = true;
+  } else {
+    const [mx, my] = mathFromCanvas(cx, cy);
+    panning = { mx, my };
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const [cx, cy] = getPos(e);
+  if (draggingDot) {
+    a = Math.round(mathYFromCanvas(cy) * 100) / 100;
+    updateKatex();
+    draw();
+  } else if (panning) {
+    const [mx, my] = mathFromCanvas(cx, cy);
+    const dx = panning.mx - mx, dy = panning.my - my;
+    xMin += dx; xMax += dx; yMin += dy; yMax += dy;
+    draw();
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', stopInteraction);
+
+// ─────────────────────────────────────────────────────────────────
+//  SCROLL ZOOM
+// ─────────────────────────────────────────────────────────────────
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
+  const [cpx, cpy] = getPos(e);
+  const [mouseX, mouseY] = mathFromCanvas(cpx, cpy);
+  if (zoomAxis !== 'y') {
+    xMin = mouseX + (xMin - mouseX) * factor;
+    xMax = mouseX + (xMax - mouseX) * factor;
+  }
+  if (zoomAxis !== 'x') {
+    yMin = mouseY + (yMin - mouseY) * factor;
+    yMax = mouseY + (yMax - mouseY) * factor;
+  }
+  draw();
+}, { passive: false });
+
+// ─────────────────────────────────────────────────────────────────
+//  DOUBLE-CLICK RESET
+// ─────────────────────────────────────────────────────────────────
+canvas.addEventListener('dblclick', () => {
+  ({ xMin, xMax, yMin, yMax } = DEFAULT_VIEW);
+  draw();
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  ZOOM AXIS SELECTOR
+// ─────────────────────────────────────────────────────────────────
+const zoomBtns = {
+  both: document.getElementById('zoom-xy'),
+  x:    document.getElementById('zoom-x'),
+  y:    document.getElementById('zoom-y'),
+};
+Object.entries(zoomBtns).forEach(([mode, btn]) => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    zoomAxis = mode;
+    Object.values(zoomBtns).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  DARK MODE CHANGE  (redraw with updated colors)
+// ─────────────────────────────────────────────────────────────────
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+
+// ─────────────────────────────────────────────────────────────────
+//  RESIZE
+// ─────────────────────────────────────────────────────────────────
+function resizeCanvas() { setCanvasSize(); draw(); }
+window.addEventListener('resize', resizeCanvas);
+
+// ─────────────────────────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────────────────────────
+applyToggleState();
+updateKatex();
+resizeCanvas();
+</script>
+</body>
+</html>
