@@ -115,7 +115,7 @@ canvas {
   border-radius: 1px;
   pointer-events: none;
 }
-  
+
 /* ── notation toggle ── */
 #notation-row {
   display: flex; align-items: center; justify-content: center;
@@ -218,8 +218,8 @@ canvas {
   #formula-display { background: #242424; border-color: #333; color: #eee; }
   #formula-display .katex { color: #eee; }
 
-  #br-tick     { background: #555; }
-  
+  #br-tick { background: #555; }
+
   #legend-upper     { color: #999; }
   #legend-hint      { color: #888; }
   #legend-drag-hint { color: #888; }
@@ -481,6 +481,7 @@ function buildFormulaTex() {
   if (useRate) {
     const r    = b - 1;
     const rAbs = fmtLatex(Math.abs(r));
+    if (rAbs < 5e-3) { return `f(x) = ${aFactor}\\left(1\\right)^{x}`; }
     const sign = r < 0 ? '-' : '+';
     return `f(x) = ${aFactor}\\left(1 ${sign} ${rAbs}\\right)^{x}`;
   } else {
@@ -499,7 +500,7 @@ function updateKatex() {
   // slider label
   const r      = b - 1;
   const brTex  = useRate
-    ? `r = ${r < -1e-3 ? '-' : ''}${fmtLatex(Math.abs(r))}`
+    ? `r = ${r < -5e-3 ? '-' : ''}${fmtLatex(Math.abs(r))}`
     : `b = ${fmtLatex(b)}`;
   renderKatex(document.getElementById('br-label'), brTex, false);
 
@@ -526,7 +527,7 @@ function updateKatex() {
   const condDecay = useRate ? 'r < 0'     : '0 < b < 1';
 
   beh.append('(');
-  if (Math.abs(b - 1) < 1e-3) {
+  if (Math.abs(b - 1) < 5e-3) {
     beh.append('Function is constant when ');
     beh.append(katexSpan(condConst));
   } else if (b > 1) {
@@ -557,7 +558,7 @@ function applyToggleState() {
   labelR.classList.toggle('active',    useRate);
   labelR.classList.toggle('inactive', !useRate);
 
-  /* LOG-SCALE: both modes encode the same underlying b as exp(sliderValue),   */
+  /* LOG-SCALE: both modes encode the same underlying b as exp(sliderValue),  */
   /* so the physical thumb position is identical when toggling between b and r. */
   /* TO REVERT to linear sliders:                                               */
   /*   b-mode: min='0.25' max='4'  step='0.01' value=String(b)                 */
@@ -570,6 +571,7 @@ function applyToggleState() {
   brSlider.step  = '0.005';
   brSlider.value = String(Math.log(b));   /* same position regardless of notation */
   /* END LOG-SCALE */
+}
 
 function toggleNotation() {
   useRate = !useRate;
