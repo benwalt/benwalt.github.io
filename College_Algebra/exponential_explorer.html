@@ -82,8 +82,10 @@ canvas {
 }
 .slider-row .slider-label {
   font-size: 13px;
-  min-width: 7ch;
+  width: 7ch;
+  flex-shrink: 0;
   white-space: nowrap;
+  text-align: right;
 }
 .slider-row input[type=range] {
   flex: 1;
@@ -101,6 +103,19 @@ canvas {
   background: #185FA5; border: none; cursor: pointer;
 }
 
+/* tick mark at centre of b/r slider (b=1, r=0) */
+#br-tick {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 8px;
+  background: #aaa;
+  border-radius: 1px;
+  pointer-events: none;
+}
+  
 /* ── notation toggle ── */
 #notation-row {
   display: flex; align-items: center; justify-content: center;
@@ -203,6 +218,8 @@ canvas {
   #formula-display { background: #242424; border-color: #333; color: #eee; }
   #formula-display .katex { color: #eee; }
 
+  #br-tick     { background: #555; }
+  
   #legend-upper     { color: #999; }
   #legend-hint      { color: #888; }
   #legend-drag-hint { color: #888; }
@@ -232,7 +249,10 @@ canvas {
 <!-- b / r slider -->
 <div class="slider-row">
   <span class="slider-label" id="br-label"></span>
-  <input type="range" id="br-slider" min="0.25" max="4" step="0.01" value="2">
+  <div style="position:relative; flex:1;">
+    <input type="range" id="br-slider" min="0.25" max="4" step="0.01" value="2" style="width:100%;">
+    <div id="br-tick"></div>
+  </div>
 </div>
 
 <!-- behavior hint + legend-main (above formula) -->
@@ -537,19 +557,19 @@ function applyToggleState() {
   labelR.classList.toggle('active',    useRate);
   labelR.classList.toggle('inactive', !useRate);
 
-  if (useRate) {
-    const r = b - 1;
-    brSlider.min   = '-0.75';
-    brSlider.max   = '3';
-    brSlider.step  = '0.01';
-    brSlider.value = String(r);
-  } else {
-    brSlider.min   = '0.25';
-    brSlider.max   = '4';
-    brSlider.step  = '0.01';
-    brSlider.value = String(b);
-  }
-}
+  /* LOG-SCALE: both modes encode the same underlying b as exp(sliderValue),   */
+  /* so the physical thumb position is identical when toggling between b and r. */
+  /* TO REVERT to linear sliders:                                               */
+  /*   b-mode: min='0.25' max='4'  step='0.01' value=String(b)                 */
+  /*   r-mode: min='-0.75' max='3' step='0.01' value=String(b-1)               */
+  /*   input handler: b = useRate ? val+1 : val;                                */
+  const logMin = Math.log(0.1);   /* ≈ -2.303 */
+  const logMax = Math.log(10);    /* ≈  2.303 — symmetric around ln(1)=0 */
+  brSlider.min   = String(logMin);
+  brSlider.max   = String(logMax);
+  brSlider.step  = '0.005';
+  brSlider.value = String(Math.log(b));   /* same position regardless of notation */
+  /* END LOG-SCALE */
 
 function toggleNotation() {
   useRate = !useRate;
@@ -563,9 +583,10 @@ labelB.addEventListener('click', () => { if (useRate)  toggleNotation(); });
 labelR.addEventListener('click', () => { if (!useRate) toggleNotation(); });
 
 brSlider.addEventListener('input', () => {
-  const val = parseFloat(brSlider.value);
-  if (useRate) b = val + 1;
-  else         b = val;
+  /* LOG-SCALE: slider value is always ln(b); derive b then r from it */
+  /* TO REVERT: b = useRate ? parseFloat(brSlider.value)+1 : parseFloat(brSlider.value); */
+  b = Math.exp(parseFloat(brSlider.value));
+  /* END LOG-SCALE */
   updateKatex();
   draw();
 });
