@@ -499,7 +499,7 @@ function updateKatex() {
   // slider label
   const r      = b - 1;
   const brTex  = useRate
-    ? `r = ${r < 0 ? '-' : ''}${fmtLatex(Math.abs(r))}`
+    ? `r = ${r < -1e-3 ? '-' : ''}${fmtLatex(Math.abs(r))}`
     : `b = ${fmtLatex(b)}`;
   renderKatex(document.getElementById('br-label'), brTex, false);
 
@@ -526,7 +526,7 @@ function updateKatex() {
   const condDecay = useRate ? 'r < 0'     : '0 < b < 1';
 
   beh.append('(');
-  if (Math.abs(b - 1) < 1e-9) {
+  if (Math.abs(b - 1) < 1e-3) {
     beh.append('Function is constant when ');
     beh.append(katexSpan(condConst));
   } else if (b > 1) {
