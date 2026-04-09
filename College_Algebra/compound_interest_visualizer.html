@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compound Interest Visualizer</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #fff;
+  color: #111;
+  padding: 1.5rem;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  touch-action: none;
+  border-radius: 8px;
+  border: 0.5px solid rgba(0,0,0,0.15);
+}
+
+#canvas-wrap { position: relative; margin: 1rem 0 0.5rem; }
+
+#legend-overlay {
+  position: absolute;
+  top: 18px; left: 64px;
+  background: rgba(255,255,255,0.92);
+  border: 0.5px solid rgba(0,0,0,0.18);
+  border-radius: 8px;
+  padding: 7px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: none;
+}
+
+.leg-row { display: flex; align-items: center; gap: 8px; }
+
+.leg-line-solid {
+  width: 28px; height: 3px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: #185FA5;
+}
+
+.leg-line-dashed {
+  width: 28px; height: 0;
+  flex-shrink: 0;
+  border-top: 2.5px dashed #C0392B;
+}
+
+.leg-label { font-size: 14px; line-height: 1; }
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 0.75rem;
+}
+
+.slider-label {
+  font-size: 13px;
+  width: 10ch;
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-align: right;
+  color: #555;
+}
+
+.slider-val {
+  font-size: 13px;
+  width: 4ch;
+  flex-shrink: 0;
+  text-align: left;
+  font-weight: 500;
+}
+
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: #ccc;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  flex: 1;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #185FA5;
+  border: none;
+  cursor: pointer;
+}
+input[type=range]::-moz-range-thumb {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #185FA5;
+  border: none;
+  cursor: pointer;
+}
+
+#n-stops {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #999;
+  padding: 0 1px;
+  margin-top: 2px;
+  flex: 1;
+}
+
+#formula-box {
+  margin: 1rem 0 0.5rem;
+  padding: 0.7rem 1.1rem;
+  background: #f6f8fc;
+  border-radius: 8px;
+  border: 0.5px solid #d8e2f0;
+  min-height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+#formula-description {
+  font-size: 13px;
+  color: #666;
+  text-align: center;
+  font-style: italic;
+}
+
+#formula-result {
+  font-size: 13px;
+  color: #666;
+  text-align: center;
+}
+
+#hint {
+  margin-top: 0.5rem;
+  font-size: 11px;
+  color: #999;
+  text-align: center;
+}
+
+/* ── dark mode ── */
+@media (prefers-color-scheme: dark) {
+  body { background: #1a1a1a; color: #eee; }
+
+  canvas { border-color: rgba(255,255,255,0.15); }
+
+  #legend-overlay {
+    background: rgba(30,30,30,0.92);
+    border-color: rgba(255,255,255,0.15);
+  }
+
+  .leg-line-solid { background: #85B7EB; }
+  .leg-line-dashed { border-top-color: #F09595; }
+
+  .slider-label { color: #aaa; }
+  input[type=range] { background: #444; }
+  input[type=range]::-webkit-slider-thumb { background: #85B7EB; }
+  input[type=range]::-moz-range-thumb     { background: #85B7EB; }
+
+  #n-stops { color: #666; }
+
+  #formula-box { background: #242424; border-color: #333; }
+  #formula-box .katex { color: #eee; }
+  #formula-description { color: #999; }
+  #hint { color: #666; }
+  #tooltip { background: rgba(30,30,30,0.95) !important; border-color: rgba(255,255,255,0.15) !important; color: #eee !important; }
+}
+</style>
+</head>
+<body>
+
+<div id="formula-box">
+  <span id="formula-math"></span>
+  <span id="formula-description"></span>
+</div>
+
+<div class="slider-row">
+  <span class="slider-label" id="label-r"></span>
+  <input type="range" id="sl-r" min="1" max="20" step="0.1" value="5" style="flex:1">
+  <span class="slider-val" id="val-r"></span>
+</div>
+
+<div class="slider-row" style="align-items:flex-start;padding-top:2px">
+  <span class="slider-label" id="label-n" style="padding-top:6px"></span>
+  <div style="display:flex;flex-direction:column;flex:1;gap:0">
+    <input type="range" id="sl-n" min="0" max="7" step="1" value="5" style="width:100%">
+    <div id="n-stops">
+      <span>½yr</span><span>1yr</span><span>6mo</span><span>3mo</span><span>2mo</span><span>mo</span><span>wk</span><span>day</span>
+    </div>
+  </div>
+  <span class="slider-val" id="val-n" style="padding-top:4px"></span>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="plot"></canvas>
+  <div id="legend-overlay">
+    <div class="leg-row">
+      <div class="leg-line-solid"></div>
+      <span class="leg-label" id="leg-discrete"></span>
+    </div>
+    <div class="leg-row">
+      <div class="leg-line-dashed"></div>
+      <span class="leg-label" id="leg-continuous"></span>
+    </div>
+  </div>
+  <div id="tooltip" style="position:absolute;display:none;pointer-events:none;background:rgba(255,255,255,0.95);border:0.5px solid rgba(0,0,0,0.18);border-radius:7px;padding:5px 10px;font-size:13px;color:#111;white-space:nowrap;"></div>
+</div>
+
+<div id="hint">Scroll to zoom &nbsp;·&nbsp; Double-click to reset view</div>
+
+<script>
+const A0 = 100;
+const N_VALUES = [0.5, 1, 2, 4, 6, 12, 52, 365];
+const N_LABELS = ['½', '1', '2', '4', '6', '12', '52', '365'];
+const N_FREQ   = ['biennially','annually','biannually','quarterly','every 2 months','monthly','weekly','daily'];
+
+let r    = 0.05;
+let nIdx = 5;
+let n    = N_VALUES[nIdx];
+
+const MARGIN_LEFT   = 56;
+const MARGIN_BOTTOM = 28;
+const MARGIN_TOP    = 14;
+const MARGIN_RIGHT  = 14;
+
+let xMax = 10;
+const DEFAULT_XMAX = 10;
+
+const canvas = document.getElementById('plot');
+const ctx    = canvas.getContext('2d');
+
+function setCanvasSize() {
+  const W = document.getElementById('canvas-wrap').clientWidth;
+  canvas.width  = W;
+  canvas.height = Math.round(W * 0.62);
+}
+function plotW() { return canvas.width  - MARGIN_LEFT - MARGIN_RIGHT; }
+function plotH() { return canvas.height - MARGIN_TOP  - MARGIN_BOTTOM; }
+
+function yMaxContinuous() {
+  return Math.max(A0 * Math.exp(r * xMax) * 1.12, 200);
+}
+function toCanvas(mx, my) {
+  const yMax = yMaxContinuous();
+  return [
+    MARGIN_LEFT + (mx / xMax) * plotW(),
+    MARGIN_TOP  + (1 - my / yMax) * plotH(),
+  ];
+}
+
+function getColors() {
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return {
+    bg:         dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+    grid:       dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)',
+    axis:       dark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.40)',
+    tick:       dark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)',
+    curve:      dark ? '#85B7EB' : '#185FA5',
+    continuous: dark ? '#F09595' : '#C0392B',
+  };
+}
+
+function niceTick(span, targetCount) {
+  const rough = span / targetCount;
+  const mag   = Math.pow(10, Math.floor(Math.log10(rough)));
+  for (const m of [1, 2, 5, 10]) if (mag * m >= rough) return mag * m;
+  return mag * 10;
+}
+function fmtTick(v) {
+  if (Math.abs(v) < 1e-9) return '0';
+  const rd = Math.round(v * 1000) / 1000;
+  return Number.isInteger(rd) ? String(Math.round(rd)) : rd.toPrecision(3).replace(/\.?0+$/, '');
+}
+
+let hoverT = null; // current mouse t value, or null if outside plot
+
+function draw() {
+  const W = canvas.width, H = canvas.height;
+  const C = getColors();
+  const PW = plotW(), PH = plotH();
+  const yMax = yMaxContinuous();
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+
+  const xTick = niceTick(xMax, 7);
+  const yTick = niceTick(yMax, 6);
+
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 0.5;
+  for (let x = xTick; x <= xMax + 1e-9; x += xTick) {
+    const [px] = toCanvas(x, 0);
+    ctx.beginPath(); ctx.moveTo(px, MARGIN_TOP); ctx.lineTo(px, MARGIN_TOP + PH); ctx.stroke();
+  }
+  for (let y = yTick; y <= yMax + 1e-9; y += yTick) {
+    const [, py] = toCanvas(0, y);
+    ctx.beginPath(); ctx.moveTo(MARGIN_LEFT, py); ctx.lineTo(MARGIN_LEFT + PW, py); ctx.stroke();
+  }
+
+  ctx.strokeStyle = C.axis; ctx.lineWidth = 2;
+  const [, yBottom] = toCanvas(0, 0);
+  const [, yTop]    = toCanvas(0, yMax);
+  ctx.beginPath(); ctx.moveTo(MARGIN_LEFT, yBottom); ctx.lineTo(MARGIN_LEFT + PW, yBottom); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(MARGIN_LEFT, yTop);    ctx.lineTo(MARGIN_LEFT, yBottom); ctx.stroke();
+
+  ctx.fillStyle = C.tick; ctx.font = '12px system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  for (let x = xTick; x <= xMax + 1e-9; x += xTick) {
+    const [px] = toCanvas(x, 0);
+    ctx.fillText(fmtTick(x), px, MARGIN_TOP + PH + 18);
+  }
+  ctx.textAlign = 'right';
+  for (let y = 0; y <= yMax + 1e-9; y += yTick) {
+    const [, py] = toCanvas(0, y);
+    ctx.fillText(fmtTick(y), MARGIN_LEFT - 7, py + 4);
+  }
+
+  const steps = Math.ceil(PW * 2);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(MARGIN_LEFT, MARGIN_TOP, PW, PH); ctx.clip();
+
+  /* continuous compounding envelope */
+  ctx.strokeStyle = C.continuous; ctx.lineWidth = 2.2; ctx.setLineDash([6, 5]);
+  let pd = false;
+  for (let i = 0; i <= steps; i++) {
+    const t  = (i / steps) * xMax;
+    const my = A0 * Math.exp(r * t);
+    const [px, py] = toCanvas(t, my);
+    if (!pd) { ctx.beginPath(); ctx.moveTo(px, py); pd = true; } else ctx.lineTo(px, py);
+  }
+  if (pd) ctx.stroke();
+  ctx.setLineDash([]);
+
+  /* discrete compounding curve */
+  ctx.strokeStyle = C.curve; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  let penDown = false;
+  for (let i = 0; i <= steps; i++) {
+    const t  = (i / steps) * xMax;
+    const my = A0 * Math.pow(1 + r / n, Math.floor(t * n));
+    if (!isFinite(my)) { if (penDown) { ctx.stroke(); penDown = false; } continue; }
+    const [px, py] = toCanvas(t, my);
+    if (!penDown) { ctx.beginPath(); ctx.moveTo(px, py); penDown = true; }
+    else ctx.lineTo(px, py);
+  }
+  if (penDown) ctx.stroke();
+
+  /* hover marker */
+  if (hoverT !== null && hoverT >= 0 && hoverT <= xMax) {
+    const hY = A0 * Math.pow(1 + r / n, Math.floor(hoverT * n));
+    const [hpx, hpy] = toCanvas(hoverT, hY);
+    const [, hpyBottom] = toCanvas(hoverT, 0);
+    const [hpxLeft]     = toCanvas(0, hY);
+
+    /* vertical + horizontal dashed guide lines */
+    ctx.strokeStyle = 'rgba(100,100,100,0.35)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(hpx, hpyBottom); ctx.lineTo(hpx, hpy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(hpxLeft, hpy);   ctx.lineTo(hpx, hpy); ctx.stroke();
+    ctx.setLineDash([]);
+
+    /* dot on curve */
+    ctx.beginPath(); ctx.arc(hpx, hpy, 5, 0, 2 * Math.PI);
+    ctx.fillStyle = C.curve; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function rk(el, tex, display) {
+  if (!el) return;
+  katex.render(tex, el, { displayMode: !!display, throwOnError: false });
+}
+function fmt(v) {
+  const rd = Math.round(v * 100) / 100;
+  if (Number.isInteger(rd)) return String(Math.round(rd));
+  return rd.toFixed(2).replace(/\.?0+$/, '');
+}
+
+function updateKatex() {
+  const rPct  = r * 100;
+  const rStr  = fmt(rPct);
+  const nDisp = n < 1 ? '\\tfrac{1}{2}' : String(Math.round(n));
+  const rFrac = fmt(r);
+  const tex   = `A(t) = 100\\,\\left(1 + \\dfrac{${rFrac}}{${nDisp}}\\right)^{\\lfloor t \\cdot ${nDisp} \\rfloor}`;
+  rk(document.getElementById('formula-math'), tex, true);
+
+  const freq  = N_FREQ[nIdx];
+  document.getElementById('formula-description').textContent =
+    `Compounding ${freq} at ${rStr}%`;
+
+  rk(document.getElementById('label-r'), `r = ${rStr}\\%`, false);
+  document.getElementById('val-r').textContent = rStr + '%';
+  rk(document.getElementById('label-n'), `n`, false);
+  document.getElementById('val-n').textContent = N_LABELS[nIdx];
+
+  const rVal = fmt(r);
+  rk(document.getElementById('leg-discrete'),   `A(t)`, false);
+  rk(document.getElementById('leg-continuous'), `100\\,e^{${rVal}\\,t}`, false);
+}
+
+/* ── hover tooltip ── */
+const tooltip = document.getElementById('tooltip');
+
+function updateTooltip(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const cx = (e.clientX - rect.left) * scaleX;
+  const PW = plotW(), PH = plotH();
+
+  if (cx < MARGIN_LEFT || cx > MARGIN_LEFT + PW) {
+    hoverT = null;
+    tooltip.style.display = 'none';
+    draw();
+    return;
+  }
+
+  hoverT = ((cx - MARGIN_LEFT) / PW) * xMax;
+  const hY = A0 * Math.pow(1 + r / n, Math.floor(hoverT * n));
+
+  const yearsStr = hoverT.toFixed(2);
+  const valStr   = hY.toFixed(2);
+  tooltip.textContent = `$${fmt(A0)} → $${valStr} after ${yearsStr} years`;
+
+  /* position tooltip: above-right of cursor, flipping left if near right edge */
+  const canvasRect = canvas.parentElement.getBoundingClientRect();
+  const tipX = e.clientX - canvasRect.left + 14;
+  const tipY = e.clientY - canvasRect.top  - 36;
+  tooltip.style.display = 'block';
+  tooltip.style.left = tipX + 'px';
+  tooltip.style.top  = tipY + 'px';
+
+  /* flip left if overflowing */
+  const tipW = tooltip.offsetWidth;
+  if (tipX + tipW > canvasRect.width - 4) {
+    tooltip.style.left = (tipX - tipW - 28) + 'px';
+  }
+
+  draw();
+}
+
+canvas.addEventListener('mousemove', updateTooltip);
+canvas.addEventListener('mouseleave', () => {
+  hoverT = null;
+  tooltip.style.display = 'none';
+  draw();
+});
+
+document.getElementById('sl-r').addEventListener('input', e => {
+  r = parseFloat(e.target.value) / 100;
+  updateKatex(); draw();
+});
+document.getElementById('sl-n').addEventListener('input', e => {
+  nIdx = parseInt(e.target.value, 10);
+  n    = N_VALUES[nIdx];
+  updateKatex(); draw();
+});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
+  xMax = Math.max(1, xMax * factor);
+  updateKatex(); draw();
+}, { passive: false });
+
+canvas.addEventListener('dblclick', () => {
+  xMax = DEFAULT_XMAX;
+  updateKatex(); draw();
+});
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+window.addEventListener('resize', () => { setCanvasSize(); updateKatex(); draw(); });
+
+setCanvasSize();
+updateKatex();
+draw();
+</script>
+</body>
+</html>
