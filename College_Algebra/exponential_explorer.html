@@ -481,7 +481,6 @@ function buildFormulaTex() {
   if (useRate) {
     const r    = b - 1;
     const rAbs = fmtLatex(Math.abs(r));
-    if (rAbs < 5e-3) { return `f(x) = ${aFactor}\\left(1\\right)^{x}`; }
     const sign = r < 0 ? '-' : '+';
     return `f(x) = ${aFactor}\\left(1 ${sign} ${rAbs}\\right)^{x}`;
   } else {
@@ -500,7 +499,7 @@ function updateKatex() {
   // slider label
   const r      = b - 1;
   const brTex  = useRate
-    ? `r = ${r < -5e-3 ? '-' : ''}${fmtLatex(Math.abs(r))}`
+    ? `r = ${r < 0 ? '-' : ''}${fmtLatex(Math.abs(r))}`
     : `b = ${fmtLatex(b)}`;
   renderKatex(document.getElementById('br-label'), brTex, false);
 
@@ -527,14 +526,14 @@ function updateKatex() {
   const condDecay = useRate ? 'r < 0'     : '0 < b < 1';
 
   beh.append('(');
-  if (Math.abs(b - 1) < 5e-3) {
+  if (Math.abs(b - 1) < 1e-9) {
     beh.append('Function is constant when ');
     beh.append(katexSpan(condConst));
   } else if (b > 1) {
     beh.append('Function grows when ');
     beh.append(katexSpan(condGrow));
   } else {
-    beh.append('Function decays when ');
+    beh.append('Function decays toward 0 when ');
     beh.append(katexSpan(condDecay));
   }
   beh.append(')');
@@ -587,7 +586,7 @@ labelR.addEventListener('click', () => { if (!useRate) toggleNotation(); });
 brSlider.addEventListener('input', () => {
   /* LOG-SCALE: slider value is always ln(b); derive b then r from it */
   /* TO REVERT: b = useRate ? parseFloat(brSlider.value)+1 : parseFloat(brSlider.value); */
-  b = Math.exp(parseFloat(brSlider.value));
+  b = snapB(Math.exp(parseFloat(brSlider.value)));
   /* END LOG-SCALE */
   updateKatex();
   draw();
@@ -618,6 +617,22 @@ function getPos(e) {
 }
 
 // ─────────────────────────────────────────────────────────────────
+//  SNAP HELPERS  (threshold = 0.04; skip b=0 which is not in range)
+// ─────────────────────────────────────────────────────────────────
+const SNAP = 0.04;
+
+function snapB(raw) {
+  const nearest = Math.round(raw);
+  if (nearest === 0) return raw;               // never snap to b=0
+  return Math.abs(raw - nearest) < SNAP ? nearest : raw;
+}
+
+function snapA(raw) {
+  const nearest = Math.round(raw);
+  return Math.abs(raw - nearest) < SNAP ? nearest : raw;
+}
+
+// ─────────────────────────────────────────────────────────────────
 //  MOUSE EVENTS
 // ─────────────────────────────────────────────────────────────────
 canvas.addEventListener('mousedown', e => {
@@ -635,7 +650,7 @@ canvas.addEventListener('mousedown', e => {
 canvas.addEventListener('mousemove', e => {
   const [cx, cy] = getPos(e);
   if (draggingDot) {
-    a = Math.round(mathYFromCanvas(cy) * 100) / 100;
+    a = snapA(Math.round(mathYFromCanvas(cy) * 100) / 100);
     updateKatex();
     draw();
   } else if (panning) {
@@ -674,7 +689,7 @@ canvas.addEventListener('touchmove', e => {
   e.preventDefault();
   const [cx, cy] = getPos(e);
   if (draggingDot) {
-    a = Math.round(mathYFromCanvas(cy) * 100) / 100;
+    a = snapA(Math.round(mathYFromCanvas(cy) * 100) / 100);
     updateKatex();
     draw();
   } else if (panning) {
