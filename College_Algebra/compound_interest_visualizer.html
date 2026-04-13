@@ -3,14 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Exponential Function Explorer</title>
+<title>Compound Interest Visualizer</title>
 
-<!-- KaTeX -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 
 <style>
-/* ── reset & base ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -18,177 +16,142 @@ body {
   background: #fff;
   color: #111;
   padding: 1.5rem;
-  max-width: 660px;
+  max-width: 680px;
   margin: 0 auto;
 }
 
-h2 {
-  text-align: center;
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  color: #111;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4em;
-  flex-wrap: wrap;
-}
-
-/* ── canvas ── */
 canvas {
   display: block;
   width: 100%;
   touch-action: none;
   border-radius: 8px;
+  border: 0.5px solid rgba(0,0,0,0.15);
 }
 
-#canvas-wrap { position: relative; }
+#canvas-wrap { position: relative; margin: 1rem 0 0.5rem; }
 
-/* ── zoom overlay ── */
-#zoom-select {
+#legend-overlay {
   position: absolute;
-  top: 8px; left: 8px;
-  display: flex; flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-#zoom-select .zoom-label {
-  font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
-  color: rgba(0,0,0,0.45);
-  text-transform: uppercase;
-  margin-bottom: 1px;
-  user-select: none;
-}
-#zoom-select button {
-  width: 36px; height: 30px;
-  border-radius: 5px;
-  border: 1px solid rgba(0,0,0,0.25);
-  background: rgba(255,255,255,0.70);
-  color: rgba(0,0,0,0.7);
-  font-size: 15px;
-  cursor: pointer;
-  transition: background 0.12s;
-  display: flex; align-items: center; justify-content: center;
-  padding: 0;
-}
-#zoom-select button:hover  { background: rgba(255,255,255,0.90); }
-#zoom-select button.active { background: rgba(0,0,0,0.65); border-color: rgba(0,0,0,0.7); color: #fff; }
-
-/* ── slider row ── */
-.slider-row {
-  display: flex; align-items: center; gap: 10px;
-  margin-top: 0.85rem;
-}
-.slider-row .slider-label {
-  font-size: 13px;
-  width: 7ch;
-  flex-shrink: 0;
-  white-space: nowrap;
-  text-align: right;
-}
-.slider-row input[type=range] {
-  flex: 1;
-  -webkit-appearance: none; appearance: none;
-  height: 2px; background: #ccc; border-radius: 1px;
-  outline: none; cursor: pointer;
-}
-.slider-row input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none; appearance: none;
-  width: 14px; height: 14px; border-radius: 50%;
-  background: #185FA5; border: none; cursor: pointer;
-}
-.slider-row input[type=range]::-moz-range-thumb {
-  width: 14px; height: 14px; border-radius: 50%;
-  background: #185FA5; border: none; cursor: pointer;
-}
-
-/* tick mark at centre of b/r slider (b=1, r=0) */
-#br-tick {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 2px;
-  height: 8px;
-  background: #aaa;
-  border-radius: 1px;
+  top: 18px; left: 64px;
+  background: rgba(255,255,255,0.92);
+  border: 0.5px solid rgba(0,0,0,0.18);
+  border-radius: 8px;
+  padding: 7px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   pointer-events: none;
 }
 
-/* ── notation toggle ── */
-#notation-row {
-  display: flex; align-items: center; justify-content: center;
-  gap: 10px;
-  margin-top: 0.9rem;
-  font-size: 13px;
-}
-#notation-row .tog-label {
-  cursor: pointer;
-  transition: color 0.15s, font-weight 0.15s;
-}
-#notation-row .tog-label.active { font-weight: 700; color: #185FA5; }
-#notation-row .tog-label.inactive { color: #888; }
+.leg-row { display: flex; align-items: center; gap: 8px; }
 
-/* toggle switch */
-#toggle-wrap {
-  position: relative;
-  width: 44px; height: 24px;
-  cursor: pointer;
+.leg-line-solid {
+  width: 28px; height: 3px;
   flex-shrink: 0;
+  border-radius: 2px;
+  background: #185FA5;
 }
-#toggle-track {
-  position: absolute; inset: 0;
-  border-radius: 12px;
-  background: #ccc;
-  transition: background 0.2s;
-}
-#toggle-track.on { background: #185FA5; }
-#toggle-thumb {
-  position: absolute;
-  top: 2px; left: 2px;
-  width: 20px; height: 20px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
-  transition: left 0.2s;
-}
-#toggle-thumb.on { left: 22px; }
 
-/* ── formula display ── */
-#formula-display {
-  margin-top: 0.85rem;
-  padding: 0.75rem 1.1rem;
+.leg-line-dashed {
+  width: 28px; height: 0;
+  flex-shrink: 0;
+  border-top: 2.5px dashed #C0392B;
+}
+
+.leg-label { font-size: 14px; line-height: 1; }
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 0.75rem;
+}
+
+.slider-label {
+  font-size: 13px;
+  width: 10ch;
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-align: right;
+  color: #555;
+}
+
+.slider-val {
+  font-size: 13px;
+  width: 4ch;
+  flex-shrink: 0;
+  text-align: left;
+  font-weight: 500;
+}
+
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: #ccc;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  flex: 1;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #185FA5;
+  border: none;
+  cursor: pointer;
+}
+input[type=range]::-moz-range-thumb {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #185FA5;
+  border: none;
+  cursor: pointer;
+}
+
+#n-stops {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #999;
+  padding: 0 1px;
+  margin-top: 2px;
+  flex: 1;
+}
+
+#formula-box {
+  margin: 1rem 0 0.5rem;
+  padding: 0.7rem 1.1rem;
   background: #f6f8fc;
   border-radius: 8px;
-  border: 1px solid #d8e2f0;
-  min-height: 3.2rem;
+  border: 0.5px solid #d8e2f0;
+  min-height: 3rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
-/* ── legend upper (above formula) ── */
-#legend-upper {
-  display: flex; flex-direction: column; gap: 5px;
-  margin-top: 0.75rem;
-  margin-bottom: 0.6rem;
-  font-size: 12px; color: #666;
+#formula-description {
+  font-size: 13px;
+  color: #666;
+  text-align: center;
+  font-style: italic;
 }
-#legend-main { display: flex; align-items: center; gap: 7px; }
-#legend-a    { font-size: 13px; }
-.legend-dot {
-  width: 12px; height: 12px; border-radius: 50%;
-  display: inline-block; flex-shrink: 0;
-  background: #E24B4A; border: 1.5px solid #A32D2D;
-}
-#legend-drag-hint { font-size: 12px; color: #777; }
-#legend-behavior  { font-size: 12px; color: #777; }
 
-/* ── legend hint (below canvas) ── */
-#legend-hint {
-  margin-top: 0.55rem;
-  font-size: 11px; color: #777;
+#formula-result {
+  font-size: 13px;
+  color: #666;
+  text-align: center;
+}
+
+#hint {
+  margin-top: 0.5rem;
+  font-size: 11px;
+  color: #999;
   text-align: center;
 }
 
@@ -196,573 +159,336 @@ canvas {
 @media (prefers-color-scheme: dark) {
   body { background: #1a1a1a; color: #eee; }
 
-  h2 { color: #eee; }
+  canvas { border-color: rgba(255,255,255,0.15); }
 
-  #zoom-select .zoom-label { color: rgba(255,255,255,0.55); }
-  #zoom-select button {
-    border-color: rgba(255,255,255,0.30);
-    background: rgba(0,0,0,0.35);
-    color: rgba(255,255,255,0.85);
+  #legend-overlay {
+    background: rgba(30,30,30,0.92);
+    border-color: rgba(255,255,255,0.15);
   }
-  #zoom-select button:hover  { background: rgba(0,0,0,0.55); }
-  #zoom-select button.active { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.65); color: #fff; }
 
-  .slider-row input[type=range] { background: #444; }
-  .slider-row input[type=range]::-webkit-slider-thumb { background: #85B7EB; }
-  .slider-row input[type=range]::-moz-range-thumb    { background: #85B7EB; }
+  .leg-line-solid { background: #85B7EB; }
+  .leg-line-dashed { border-top-color: #F09595; }
 
-  #notation-row .tog-label.inactive { color: #666; }
-  #notation-row .tog-label.active   { color: #85B7EB; }
-  #toggle-track.on { background: #185FA5; }
+  .slider-label { color: #aaa; }
+  input[type=range] { background: #444; }
+  input[type=range]::-webkit-slider-thumb { background: #85B7EB; }
+  input[type=range]::-moz-range-thumb     { background: #85B7EB; }
 
-  #formula-display { background: #242424; border-color: #333; color: #eee; }
-  #formula-display .katex { color: #eee; }
+  #n-stops { color: #666; }
 
-  #br-tick { background: #555; }
-
-  #legend-upper     { color: #999; }
-  #legend-hint      { color: #888; }
-  #legend-drag-hint { color: #888; }
-  #legend-behavior  { color: #888; }
-  .legend-dot { background: #F09595; border-color: #E24B4A; }
-
-  .slider-row .slider-label { color: #aaa; }
+  #formula-box { background: #242424; border-color: #333; }
+  #formula-box .katex { color: #eee; }
+  #formula-description { color: #999; }
+  #hint { color: #666; }
+  #tooltip { background: rgba(30,30,30,0.95) !important; border-color: rgba(255,255,255,0.15) !important; color: #eee !important; }
 }
 </style>
 </head>
 <body>
 
-<h2 id="page-title">
-  Exponential Function:&nbsp;<span id="header-math"></span>
-</h2>
-
-<!-- notation toggle -->
-<div id="notation-row">
-  <span id="label-b" class="tog-label active"></span>
-  <div id="toggle-wrap">
-    <div id="toggle-track"></div>
-    <div id="toggle-thumb"></div>
-  </div>
-  <span id="label-r" class="tog-label inactive"></span>
-</div>
-
-<!-- b / r slider -->
-<div class="slider-row">
-  <span class="slider-label" id="br-label"></span>
-  <div style="position:relative; flex:1;">
-    <input type="range" id="br-slider" min="0.25" max="4" step="0.01" value="2" style="width:100%;">
-    <div id="br-tick"></div>
-  </div>
-</div>
-
-<!-- behavior hint + legend-main (above formula) -->
-<div id="legend-upper">
-  <div id="legend-behavior"></div>
-  <div id="legend-main">
-    <span class="legend-dot"></span>
-    <span id="legend-a"></span>
-    <span id="legend-drag-hint">&nbsp;&nbsp;<i>(drag the red dot up/down to change the initial value, <span id="legend-a-sym"></span>)</i></span>
-  </div>
-</div>
-
-<!-- formula display -->
-<div id="formula-display">
+<div id="formula-box">
   <span id="formula-math"></span>
+  <span id="formula-description"></span>
 </div>
 
-<!-- canvas -->
+<div class="slider-row">
+  <span class="slider-label" id="label-r"></span>
+  <input type="range" id="sl-r" min="1" max="20" step="0.1" value="5" style="flex:1">
+  <span class="slider-val" id="val-r"></span>
+</div>
+
+<div class="slider-row" style="align-items:flex-start;padding-top:2px">
+  <span class="slider-label" id="label-n" style="padding-top:6px"></span>
+  <div style="display:flex;flex-direction:column;flex:1;gap:0">
+    <input type="range" id="sl-n" min="0" max="7" step="1" value="5" style="width:100%">
+    <div id="n-stops">
+      <span>2yr</span><span>1yr</span><span>6mo</span><span>3mo</span><span>2mo</span><span>mo</span><span>wk</span><span>day</span>
+    </div>
+  </div>
+  <span class="slider-val" id="val-n" style="padding-top:4px"></span>
+</div>
+
 <div id="canvas-wrap">
   <canvas id="plot"></canvas>
-  <div id="zoom-select">
-    <div class="zoom-label">Zoom</div>
-    <button id="zoom-xy" class="active" title="Zoom both axes">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <line x1="1" y1="8" x2="15" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        <polyline points="4,5 1,8 4,11" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
-        <polyline points="12,5 15,8 12,11" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
-        <line x1="8" y1="1" x2="8" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        <polyline points="5,4 8,1 11,4" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
-        <polyline points="5,12 8,15 11,12" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
-      </svg>
-    </button>
-    <button id="zoom-x" title="Zoom x-axis only">&#x2194;</button>
-    <button id="zoom-y" title="Zoom y-axis only">&#x2195;</button>
+  <div id="legend-overlay">
+    <div class="leg-row">
+      <div class="leg-line-solid"></div>
+      <span class="leg-label" id="leg-discrete"></span>
+    </div>
+    <div class="leg-row">
+      <div class="leg-line-dashed"></div>
+      <span class="leg-label" id="leg-continuous"></span>
+    </div>
   </div>
+  <div id="tooltip" style="position:absolute;display:none;pointer-events:none;background:rgba(255,255,255,0.95);border:0.5px solid rgba(0,0,0,0.18);border-radius:7px;padding:5px 10px;font-size:13px;color:#111;white-space:nowrap;"></div>
 </div>
 
-<!-- hint below canvas -->
-<div id="legend-hint">Scroll to zoom &nbsp;·&nbsp; Drag canvas to pan &nbsp;·&nbsp; Double-click to reset view</div>
+<div id="hint">Scroll to zoom &nbsp;·&nbsp; Double-click to reset view</div>
 
 <script>
-// ─────────────────────────────────────────────────────────────────
-//  STATE
-// ─────────────────────────────────────────────────────────────────
-let a = 1;         // y-intercept / vertical scale
-let b = 2;         // base (bˣ notation)
-let useRate = false;  // false → b notation, true → r notation
+const A0 = 100;
+const N_VALUES = [0.5, 1, 2, 4, 6, 12, 52, 365];
+const N_LABELS = ['½', '1', '2', '4', '6', '12', '52', '365'];
+const N_FREQ   = ['biennially','annually','biannually','quarterly','every 2 months','monthly','weekly','daily'];
 
-let xMin = -4, xMax = 4, yMin = -6, yMax = 20;
-const DEFAULT_VIEW = { xMin: -4, xMax: 4, yMin: -6, yMax: 20 };
+let r    = 0.05;
+let nIdx = 5;
+let n    = N_VALUES[nIdx];
 
-let zoomAxis = 'both';   // 'both' | 'x' | 'y'
-let draggingDot = false;
-let panning = null;      // { mx, my } math-space anchor
+const MARGIN_LEFT   = 56;
+const MARGIN_BOTTOM = 28;
+const MARGIN_TOP    = 14;
+const MARGIN_RIGHT  = 14;
 
-const DOT_HIT_RADIUS = 14;
+let xMax = 10;
+const DEFAULT_XMAX = 10;
 
-// ─────────────────────────────────────────────────────────────────
-//  CANVAS SETUP
-// ─────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('plot');
 const ctx    = canvas.getContext('2d');
 
 function setCanvasSize() {
   const W = document.getElementById('canvas-wrap').clientWidth;
   canvas.width  = W;
-  canvas.height = Math.round(W * 0.65);
+  canvas.height = Math.round(W * 0.62);
 }
+function plotW() { return canvas.width  - MARGIN_LEFT - MARGIN_RIGHT; }
+function plotH() { return canvas.height - MARGIN_TOP  - MARGIN_BOTTOM; }
 
-// coordinate transforms
+function yMaxContinuous() {
+  return Math.max(A0 * Math.exp(r * xMax) * 1.12, 200);
+}
 function toCanvas(mx, my) {
+  const yMax = yMaxContinuous();
   return [
-    (mx - xMin) / (xMax - xMin) * canvas.width,
-    (1 - (my - yMin) / (yMax - yMin)) * canvas.height,
+    MARGIN_LEFT + (mx / xMax) * plotW(),
+    MARGIN_TOP  + (1 - my / yMax) * plotH(),
   ];
-}
-function mathFromCanvas(cx, cy) {
-  return [
-    xMin + (cx / canvas.width)  * (xMax - xMin),
-    yMin + (1 - cy / canvas.height) * (yMax - yMin),
-  ];
-}
-function mathYFromCanvas(cy) {
-  return yMin + (1 - cy / canvas.height) * (yMax - yMin);
 }
 
-// ─────────────────────────────────────────────────────────────────
-//  COLORS  (dark-mode aware)
-// ─────────────────────────────────────────────────────────────────
 function getColors() {
   const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   return {
-    bg:     dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-    grid:   dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)',
-    axis:   dark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.35)',
-    tick:   dark ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.40)',
-    curve:  dark ? '#85B7EB'                : '#185FA5',
-    dotFill:   dark ? '#F09595' : '#E24B4A',
-    dotStroke: dark ? '#E24B4A' : '#A32D2D',
-    dotGlow:   dark ? 'rgba(240,149,149,0.18)' : 'rgba(226,75,74,0.15)',
-    guide:     dark ? 'rgba(240,149,149,0.30)' : 'rgba(226,75,74,0.35)',
+    bg:         dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+    grid:       dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)',
+    axis:       dark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.40)',
+    tick:       dark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)',
+    curve:      dark ? '#85B7EB' : '#185FA5',
+    continuous: dark ? '#F09595' : '#C0392B',
   };
 }
 
-// ─────────────────────────────────────────────────────────────────
-//  ADAPTIVE TICKS
-// ─────────────────────────────────────────────────────────────────
-function niceTick(span) {
-  const rough = span / 7;
+function niceTick(span, targetCount) {
+  const rough = span / targetCount;
   const mag   = Math.pow(10, Math.floor(Math.log10(rough)));
   for (const m of [1, 2, 5, 10]) if (mag * m >= rough) return mag * m;
   return mag * 10;
 }
 function fmtTick(v) {
   if (Math.abs(v) < 1e-9) return '0';
-  const r = Math.round(v * 100) / 100;
-  return Number.isInteger(r) ? String(Math.round(r)) : r.toPrecision(3).replace(/\.?0+$/, '');
+  const rd = Math.round(v * 1000) / 1000;
+  return Number.isInteger(rd) ? String(Math.round(rd)) : rd.toPrecision(3).replace(/\.?0+$/, '');
 }
 
-// ─────────────────────────────────────────────────────────────────
-//  DRAW
-// ─────────────────────────────────────────────────────────────────
+let hoverT = null; // current mouse t value, or null if outside plot
+
 function draw() {
   const W = canvas.width, H = canvas.height;
   const C = getColors();
+  const PW = plotW(), PH = plotH();
+  const yMax = yMaxContinuous();
 
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
 
-  const xTick  = niceTick(xMax - xMin);
-  const yTick  = niceTick(yMax - yMin);
-  const xStart = Math.ceil(xMin / xTick) * xTick;
-  const yStart = Math.ceil(yMin / yTick) * yTick;
+  const xTick = niceTick(xMax, 7);
+  const yTick = niceTick(yMax, 6);
 
-  // grid
   ctx.strokeStyle = C.grid; ctx.lineWidth = 0.5;
-  for (let x = xStart; x <= xMax + 1e-9; x += xTick) {
+  for (let x = xTick; x <= xMax + 1e-9; x += xTick) {
     const [px] = toCanvas(x, 0);
-    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px, MARGIN_TOP); ctx.lineTo(px, MARGIN_TOP + PH); ctx.stroke();
   }
-  for (let y = yStart; y <= yMax + 1e-9; y += yTick) {
+  for (let y = yTick; y <= yMax + 1e-9; y += yTick) {
     const [, py] = toCanvas(0, y);
-    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(W, py); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(MARGIN_LEFT, py); ctx.lineTo(MARGIN_LEFT + PW, py); ctx.stroke();
   }
 
-  // axes
-  const [ox, oy] = toCanvas(0, 0);
   ctx.strokeStyle = C.axis; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0, oy);  ctx.lineTo(W, oy);  ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(ox, 0);  ctx.lineTo(ox, H);  ctx.stroke();
+  const [, yBottom] = toCanvas(0, 0);
+  const [, yTop]    = toCanvas(0, yMax);
+  ctx.beginPath(); ctx.moveTo(MARGIN_LEFT, yBottom); ctx.lineTo(MARGIN_LEFT + PW, yBottom); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(MARGIN_LEFT, yTop);    ctx.lineTo(MARGIN_LEFT, yBottom); ctx.stroke();
 
-  // tick labels
-  ctx.fillStyle = C.tick; ctx.font = '13px system-ui,sans-serif';
+  ctx.fillStyle = C.tick; ctx.font = '12px system-ui,sans-serif';
   ctx.textAlign = 'center';
-  for (let x = xStart; x <= xMax + 1e-9; x += xTick) {
-    if (Math.abs(x) < xTick * 0.01) continue;
+  for (let x = xTick; x <= xMax + 1e-9; x += xTick) {
     const [px] = toCanvas(x, 0);
-    ctx.fillText(fmtTick(x), px, Math.min(Math.max(oy + 16, 16), H - 4));
+    ctx.fillText(fmtTick(x), px, MARGIN_TOP + PH + 18);
   }
   ctx.textAlign = 'right';
-  for (let y = yStart; y <= yMax + 1e-9; y += yTick) {
-    if (Math.abs(y) < yTick * 0.01) continue;
+  for (let y = 0; y <= yMax + 1e-9; y += yTick) {
     const [, py] = toCanvas(0, y);
-    ctx.fillText(fmtTick(y), Math.min(Math.max(ox - 6, 28), W - 4), py + 5);
+    ctx.fillText(fmtTick(y), MARGIN_LEFT - 7, py + 4);
   }
 
-  // ── curve ────────────────────────────────────────────────────────
-  const steps = Math.ceil(W * 3);
+  const steps = Math.ceil(PW * 2);
   ctx.save();
-  ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+  ctx.beginPath(); ctx.rect(MARGIN_LEFT, MARGIN_TOP, PW, PH); ctx.clip();
+
+  /* continuous compounding envelope */
+  ctx.strokeStyle = C.continuous; ctx.lineWidth = 2.2; ctx.setLineDash([6, 5]);
+  let pd = false;
+  for (let i = 0; i <= steps; i++) {
+    const t  = (i / steps) * xMax;
+    const my = A0 * Math.exp(r * t);
+    const [px, py] = toCanvas(t, my);
+    if (!pd) { ctx.beginPath(); ctx.moveTo(px, py); pd = true; } else ctx.lineTo(px, py);
+  }
+  if (pd) ctx.stroke();
+  ctx.setLineDash([]);
+
+  /* discrete compounding curve */
   ctx.strokeStyle = C.curve; ctx.lineWidth = 3; ctx.lineJoin = 'round';
   let penDown = false;
   for (let i = 0; i <= steps; i++) {
-    const mx = xMin + (i / steps) * (xMax - xMin);
-    const my = a * Math.pow(b, mx);
+    const t  = (i / steps) * xMax;
+    const my = A0 * Math.pow(1 + r / n, Math.floor(t * n));
     if (!isFinite(my)) { if (penDown) { ctx.stroke(); penDown = false; } continue; }
-    const [px, py] = toCanvas(mx, my);
+    const [px, py] = toCanvas(t, my);
     if (!penDown) { ctx.beginPath(); ctx.moveTo(px, py); penDown = true; }
     else ctx.lineTo(px, py);
   }
   if (penDown) ctx.stroke();
-  ctx.restore();
 
-  // ── dashed guide on y-axis to dot ────────────────────────────────
-  if (ox >= 0 && ox <= W) {
-    const [, dotPy]  = toCanvas(0, a);
-    const [, zeroPy] = toCanvas(0, 0);
-    ctx.save();
-    ctx.setLineDash([3, 4]);
-    ctx.strokeStyle = C.guide; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(ox, zeroPy); ctx.lineTo(ox, dotPy); ctx.stroke();
+  /* hover marker */
+  if (hoverT !== null && hoverT >= 0 && hoverT <= xMax) {
+    const hY = A0 * Math.pow(1 + r / n, Math.floor(hoverT * n));
+    const [hpx, hpy] = toCanvas(hoverT, hY);
+    const [, hpyBottom] = toCanvas(hoverT, 0);
+    const [hpxLeft]     = toCanvas(0, hY);
+
+    /* vertical + horizontal dashed guide lines */
+    ctx.strokeStyle = 'rgba(100,100,100,0.35)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(hpx, hpyBottom); ctx.lineTo(hpx, hpy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(hpxLeft, hpy);   ctx.lineTo(hpx, hpy); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.restore();
+
+    /* dot on curve */
+    ctx.beginPath(); ctx.arc(hpx, hpy, 5, 0, 2 * Math.PI);
+    ctx.fillStyle = C.curve; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
   }
 
-  // ── draggable dot ─────────────────────────────────────────────────
-  if (a >= yMin && a <= yMax) {
-    const [dx, dy] = toCanvas(0, a);
-    ctx.beginPath(); ctx.arc(dx, dy, 12, 0, 2 * Math.PI);
-    ctx.fillStyle = C.dotGlow; ctx.fill();
-    ctx.beginPath(); ctx.arc(dx, dy, 7, 0, 2 * Math.PI);
-    ctx.fillStyle = C.dotFill; ctx.fill();
-    ctx.strokeStyle = C.dotStroke; ctx.lineWidth = 1.5; ctx.stroke();
-  }
+  ctx.restore();
 }
 
-// ─────────────────────────────────────────────────────────────────
-//  KATEX RENDERING
-// ─────────────────────────────────────────────────────────────────
-function renderKatex(el, tex, display) {
+function rk(el, tex, display) {
+  if (!el) return;
   katex.render(tex, el, { displayMode: !!display, throwOnError: false });
 }
-
-function fmtLatex(v) {
-  if (Math.abs(v) < 1e-9) return '0';
-  const r = Math.round(v * 100) / 100;
-  if (Number.isInteger(r)) return String(Math.round(r));
-  return r.toFixed(2).replace(/\.?0+$/, '');
-}
-
-function buildFormulaTex() {
-  const aStr = fmtLatex(a);
-  const aFactor = aStr === '1'  ? ''
-                : aStr === '-1' ? '-'
-                : `${aStr} \\cdot `;
-  if (useRate) {
-    const r    = b - 1;
-    const rAbs = fmtLatex(Math.abs(r));
-    const sign = r < 0 ? '-' : '+';
-    return `f(x) = ${aFactor}\\left(1 ${sign} ${rAbs}\\right)^{x}`;
-  } else {
-    return `f(x) = ${aFactor}${fmtLatex(b)}^{x}`;
-  }
-}
-
-function buildHeaderTex() {
-  return useRate ? 'f(x) = a \\cdot (1+r)^{x}' : 'f(x) = a \\cdot b^{x}';
+function fmt(v) {
+  const rd = Math.round(v * 100) / 100;
+  if (Number.isInteger(rd)) return String(Math.round(rd));
+  return rd.toFixed(2).replace(/\.?0+$/, '');
 }
 
 function updateKatex() {
-  renderKatex(document.getElementById('header-math'),  buildHeaderTex(), false);
-  renderKatex(document.getElementById('formula-math'), buildFormulaTex(), true);
+  const rPct  = r * 100;
+  const rStr  = fmt(rPct);
+  const nDisp = n < 1 ? '\\tfrac{1}{2}' : String(Math.round(n));
+  const rFrac = fmt(r);
+  const tex   = `A(t) = 100\\,\\left(1 + \\dfrac{${rFrac}}{${nDisp}}\\right)^{\\lfloor t \\cdot ${nDisp} \\rfloor}`;
+  rk(document.getElementById('formula-math'), tex, true);
 
-  // slider label
-  const r      = b - 1;
-  const brTex  = useRate
-    ? `r = ${r < 0 ? '-' : ''}${fmtLatex(Math.abs(r))}`
-    : `b = ${fmtLatex(b)}`;
-  renderKatex(document.getElementById('br-label'), brTex, false);
+  const freq  = N_FREQ[nIdx];
+  document.getElementById('formula-description').textContent =
+    `Compounding ${freq} at ${rStr}%`;
 
-  // legend
-  renderKatex(document.getElementById('legend-a'),     `a = ${fmtLatex(a)}`, false);
-  renderKatex(document.getElementById('legend-a-sym'), 'a', false);
+  rk(document.getElementById('label-r'), `r = ${rStr}\\%`, false);
+  document.getElementById('val-r').textContent = rStr + '%';
+  rk(document.getElementById('label-n'), `n`, false);
+  document.getElementById('val-n').textContent = N_LABELS[nIdx];
 
-  // notation toggle labels
-  renderKatex(document.getElementById('label-b'), 'b\\text{ notation}', false);
-  renderKatex(document.getElementById('label-r'), 'r\\text{ notation}', false);
-
-  // ── behavior hint (single clause for current state, in parentheses) ─
-  const beh = document.getElementById('legend-behavior');
-  beh.innerHTML = '';
-
-  function katexSpan(tex) {
-    const sp = document.createElement('span');
-    renderKatex(sp, tex, false);
-    return sp;
-  }
-
-  const condGrow  = useRate ? 'r > 0'     : 'b > 1';
-  const condConst = useRate ? 'r = 0'     : 'b = 1';
-  const condDecay = useRate ? 'r < 0'     : '0 < b < 1';
-
-  beh.append('(');
-  if (Math.abs(b - 1) < 1e-9) {
-    beh.append('Function is constant when ');
-    beh.append(katexSpan(condConst));
-  } else if (b > 1) {
-    beh.append('Function grows when ');
-    beh.append(katexSpan(condGrow));
-  } else {
-    beh.append('Function decays toward 0 when ');
-    beh.append(katexSpan(condDecay));
-  }
-  beh.append(')');
+  const rVal = fmt(r);
+  rk(document.getElementById('leg-discrete'),   `A(t)`, false);
+  rk(document.getElementById('leg-continuous'), `100\\,e^{${rVal}\\,t}`, false);
 }
 
-// ─────────────────────────────────────────────────────────────────
-//  NOTATION TOGGLE
-// ─────────────────────────────────────────────────────────────────
-const toggleWrap  = document.getElementById('toggle-wrap');
-const toggleTrack = document.getElementById('toggle-track');
-const toggleThumb = document.getElementById('toggle-thumb');
-const labelB      = document.getElementById('label-b');
-const labelR      = document.getElementById('label-r');
-const brSlider    = document.getElementById('br-slider');
+/* ── hover tooltip ── */
+const tooltip = document.getElementById('tooltip');
 
-function applyToggleState() {
-  toggleTrack.classList.toggle('on', useRate);
-  toggleThumb.classList.toggle('on', useRate);
-  labelB.classList.toggle('active',   !useRate);
-  labelB.classList.toggle('inactive',  useRate);
-  labelR.classList.toggle('active',    useRate);
-  labelR.classList.toggle('inactive', !useRate);
+function updateTooltip(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const cx = (e.clientX - rect.left) * scaleX;
+  const PW = plotW(), PH = plotH();
 
-  /* LOG-SCALE: both modes encode the same underlying b as exp(sliderValue),  */
-  /* so the physical thumb position is identical when toggling between b and r. */
-  /* TO REVERT to linear sliders:                                               */
-  /*   b-mode: min='0.25' max='4'  step='0.01' value=String(b)                 */
-  /*   r-mode: min='-0.75' max='3' step='0.01' value=String(b-1)               */
-  /*   input handler: b = useRate ? val+1 : val;                                */
-  const logMin = Math.log(0.1);   /* ≈ -2.303 */
-  const logMax = Math.log(10);    /* ≈  2.303 — symmetric around ln(1)=0 */
-  brSlider.min   = String(logMin);
-  brSlider.max   = String(logMax);
-  brSlider.step  = '0.005';
-  brSlider.value = String(Math.log(b));   /* same position regardless of notation */
-  /* END LOG-SCALE */
-}
+  if (cx < MARGIN_LEFT || cx > MARGIN_LEFT + PW) {
+    hoverT = null;
+    tooltip.style.display = 'none';
+    draw();
+    return;
+  }
 
-function toggleNotation() {
-  useRate = !useRate;
-  applyToggleState();
-  updateKatex();
+  hoverT = ((cx - MARGIN_LEFT) / PW) * xMax;
+  const hY = A0 * Math.pow(1 + r / n, Math.floor(hoverT * n));
+
+  const yearsStr = hoverT.toFixed(2);
+  const valStr   = hY.toFixed(2);
+  tooltip.textContent = `$${fmt(A0)} → $${valStr} after ${yearsStr} years`;
+
+  /* position tooltip: above-right of cursor, flipping left if near right edge */
+  const canvasRect = canvas.parentElement.getBoundingClientRect();
+  const tipX = e.clientX - canvasRect.left + 14;
+  const tipY = e.clientY - canvasRect.top  - 36;
+  tooltip.style.display = 'block';
+  tooltip.style.left = tipX + 'px';
+  tooltip.style.top  = tipY + 'px';
+
+  /* flip left if overflowing */
+  const tipW = tooltip.offsetWidth;
+  if (tipX + tipW > canvasRect.width - 4) {
+    tooltip.style.left = (tipX - tipW - 28) + 'px';
+  }
+
   draw();
 }
 
-toggleWrap.addEventListener('click', toggleNotation);
-labelB.addEventListener('click', () => { if (useRate)  toggleNotation(); });
-labelR.addEventListener('click', () => { if (!useRate) toggleNotation(); });
-
-brSlider.addEventListener('input', () => {
-  /* LOG-SCALE: slider value is always ln(b); derive b then r from it */
-  /* TO REVERT: b = useRate ? parseFloat(brSlider.value)+1 : parseFloat(brSlider.value); */
-  b = snapB(Math.exp(parseFloat(brSlider.value)));
-  /* END LOG-SCALE */
-  updateKatex();
+canvas.addEventListener('mousemove', updateTooltip);
+canvas.addEventListener('mouseleave', () => {
+  hoverT = null;
+  tooltip.style.display = 'none';
   draw();
 });
 
-// ─────────────────────────────────────────────────────────────────
-//  DOT HIT TEST
-// ─────────────────────────────────────────────────────────────────
-function dotCanvasPos() {
-  if (a < yMin || a > yMax) return null;
-  return toCanvas(0, a);
-}
-
-function hitTestDot(cx, cy) {
-  const pos = dotCanvasPos();
-  if (!pos) return false;
-  const dx = cx - pos[0], dy = cy - pos[1];
-  return dx * dx + dy * dy <= DOT_HIT_RADIUS * DOT_HIT_RADIUS;
-}
-
-// ─────────────────────────────────────────────────────────────────
-//  POINTER HELPERS
-// ─────────────────────────────────────────────────────────────────
-function getPos(e) {
-  const r = canvas.getBoundingClientRect(), s = canvas.width / r.width;
-  const src = e.touches ? e.touches[0] : e;
-  return [(src.clientX - r.left) * s, (src.clientY - r.top) * s];
-}
-
-// ─────────────────────────────────────────────────────────────────
-//  SNAP HELPERS  (threshold = 0.04; skip b=0 which is not in range)
-// ─────────────────────────────────────────────────────────────────
-const SNAP = 0.04;
-
-function snapB(raw) {
-  const nearest = Math.round(raw);
-  if (nearest === 0) return raw;               // never snap to b=0
-  return Math.abs(raw - nearest) < SNAP ? nearest : raw;
-}
-
-function snapA(raw) {
-  const nearest = Math.round(raw);
-  return Math.abs(raw - nearest) < SNAP ? nearest : raw;
-}
-
-// ─────────────────────────────────────────────────────────────────
-//  MOUSE EVENTS
-// ─────────────────────────────────────────────────────────────────
-canvas.addEventListener('mousedown', e => {
-  const [cx, cy] = getPos(e);
-  if (hitTestDot(cx, cy)) {
-    draggingDot = true;
-    canvas.style.cursor = 'grabbing';
-  } else {
-    const [mx, my] = mathFromCanvas(cx, cy);
-    panning = { mx, my };
-    canvas.style.cursor = 'move';
-  }
+document.getElementById('sl-r').addEventListener('input', e => {
+  r = parseFloat(e.target.value) / 100;
+  updateKatex(); draw();
+});
+document.getElementById('sl-n').addEventListener('input', e => {
+  nIdx = parseInt(e.target.value, 10);
+  n    = N_VALUES[nIdx];
+  updateKatex(); draw();
 });
 
-canvas.addEventListener('mousemove', e => {
-  const [cx, cy] = getPos(e);
-  if (draggingDot) {
-    a = snapA(Math.round(mathYFromCanvas(cy) * 100) / 100);
-    updateKatex();
-    draw();
-  } else if (panning) {
-    const [mx, my] = mathFromCanvas(cx, cy);
-    const dx = panning.mx - mx, dy = panning.my - my;
-    xMin += dx; xMax += dx; yMin += dy; yMax += dy;
-    draw();
-  } else {
-    canvas.style.cursor = hitTestDot(cx, cy) ? 'grab' : 'default';
-  }
-});
-
-function stopInteraction() {
-  draggingDot = false;
-  panning = null;
-  canvas.style.cursor = 'default';
-}
-canvas.addEventListener('mouseup',    stopInteraction);
-canvas.addEventListener('mouseleave', stopInteraction);
-
-// ─────────────────────────────────────────────────────────────────
-//  TOUCH EVENTS
-// ─────────────────────────────────────────────────────────────────
-canvas.addEventListener('touchstart', e => {
-  e.preventDefault();
-  const [cx, cy] = getPos(e);
-  if (hitTestDot(cx, cy)) {
-    draggingDot = true;
-  } else {
-    const [mx, my] = mathFromCanvas(cx, cy);
-    panning = { mx, my };
-  }
-}, { passive: false });
-
-canvas.addEventListener('touchmove', e => {
-  e.preventDefault();
-  const [cx, cy] = getPos(e);
-  if (draggingDot) {
-    a = snapA(Math.round(mathYFromCanvas(cy) * 100) / 100);
-    updateKatex();
-    draw();
-  } else if (panning) {
-    const [mx, my] = mathFromCanvas(cx, cy);
-    const dx = panning.mx - mx, dy = panning.my - my;
-    xMin += dx; xMax += dx; yMin += dy; yMax += dy;
-    draw();
-  }
-}, { passive: false });
-
-canvas.addEventListener('touchend', stopInteraction);
-
-// ─────────────────────────────────────────────────────────────────
-//  SCROLL ZOOM
-// ─────────────────────────────────────────────────────────────────
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
   const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
-  const [cpx, cpy] = getPos(e);
-  const [mouseX, mouseY] = mathFromCanvas(cpx, cpy);
-  if (zoomAxis !== 'y') {
-    xMin = mouseX + (xMin - mouseX) * factor;
-    xMax = mouseX + (xMax - mouseX) * factor;
-  }
-  if (zoomAxis !== 'x') {
-    yMin = mouseY + (yMin - mouseY) * factor;
-    yMax = mouseY + (yMax - mouseY) * factor;
-  }
-  draw();
+  xMax = Math.max(1, xMax * factor);
+  updateKatex(); draw();
 }, { passive: false });
 
-// ─────────────────────────────────────────────────────────────────
-//  DOUBLE-CLICK RESET
-// ─────────────────────────────────────────────────────────────────
 canvas.addEventListener('dblclick', () => {
-  ({ xMin, xMax, yMin, yMax } = DEFAULT_VIEW);
-  draw();
+  xMax = DEFAULT_XMAX;
+  updateKatex(); draw();
 });
 
-// ─────────────────────────────────────────────────────────────────
-//  ZOOM AXIS SELECTOR
-// ─────────────────────────────────────────────────────────────────
-const zoomBtns = {
-  both: document.getElementById('zoom-xy'),
-  x:    document.getElementById('zoom-x'),
-  y:    document.getElementById('zoom-y'),
-};
-Object.entries(zoomBtns).forEach(([mode, btn]) => {
-  btn.addEventListener('click', e => {
-    e.stopPropagation();
-    zoomAxis = mode;
-    Object.values(zoomBtns).forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────
-//  DARK MODE CHANGE  (redraw with updated colors)
-// ─────────────────────────────────────────────────────────────────
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+window.addEventListener('resize', () => { setCanvasSize(); updateKatex(); draw(); });
 
-// ─────────────────────────────────────────────────────────────────
-//  RESIZE
-// ─────────────────────────────────────────────────────────────────
-function resizeCanvas() { setCanvasSize(); draw(); }
-window.addEventListener('resize', resizeCanvas);
-
-// ─────────────────────────────────────────────────────────────────
-//  INIT
-// ─────────────────────────────────────────────────────────────────
-applyToggleState();
+setCanvasSize();
 updateKatex();
-resizeCanvas();
+draw();
 </script>
 </body>
 </html>
