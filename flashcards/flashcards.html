@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flashcards</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    .flip-card {
+      perspective: 1000px;
+      width: 28rem;
+      height: 18rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .flip-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+      border-radius: 1rem;
+    }
+    .flip-face {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      border-radius: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+      border: 2px solid rgba(0,0,0,0.05);
+      padding: 1.5rem;
+      box-sizing: border-box;
+    }
+    .flip-front { background-color: #ffffff; }
+    .flip-back  {
+      transform: rotateY(180deg);
+      background-color: #bfdbfe;
+    }
+    .flip-card:hover .flip-face {
+      box-shadow: 0 12px 24px rgba(0,0,0,0.25);
+    }
+    .flip-card.flipped .flip-inner {
+      transform: rotateY(180deg) scale(1.03);
+      transform-style: preserve-3d;
+    }
+
+    /* Text card font sizing */
+    .text-card-content {
+      font-size: 1.6rem;
+      line-height: 1.4;
+      text-align: center;
+      word-break: break-word;
+    }
+
+    /* Loading / error states */
+    .status-box {
+      width: 28rem;
+      min-height: 10rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      background: white;
+      border-radius: 1rem;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+      padding: 2rem;
+      text-align: center;
+    }
+  </style>
+
+  <!-- KaTeX — synchronous math rendering for math card_type -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+</head>
+
+<body class="bg-slate-100 flex flex-col items-center justify-center min-h-screen text-center p-4">
+  <div id="app"></div>
+
+<script>
+/* ================================================================
+   TEMPLATE ENGINE
+   Supported templates (variables are single capital letters A–Z):
+   
+   {{A}}        — raw number value of variable A
+   {{ax}}       — sign-aware coefficient: A*x  (e.g. -x, 3x, x)
+   {{ax+b}}     — sign-aware linear:  Ax + B   (e.g. -x + 3, 2x - 5)
+   {{ax^2+bx+c}} — quadratic display: Ax² + Bx + C
+   {{2ax+b}}    — derivative of above quadratic: 2A*x + B
+   {{expr}}     — any expression: tokens are evaluated, then
+                  numbers adjacent to variables are formatted sign-aware
+   
+   Variables block per card (all optional):
+   {
+     "A": { "type": "int", "min": -9, "max": 9,
+            "nonzero": true, "notequalto": ["B","C"] }
+   }
+================================================================ */
+
+function rollVariables(varDefs) {
+  if (!varDefs) return {};
+  const vals = {};
+  for (const [name, def] of Object.entries(varDefs)) {
+    let val, attempts = 0;
+    do {
+      val = Math.floor(Math.random() * (def.max - def.min + 1)) + def.min;
+      attempts++;
+      if (attempts > 1000) break; // safety
+    } while (
+      (def.nonzero && val === 0) ||
+      (def.notequalto && def.notequalto.some(k => vals[k] !== undefined && vals[k] === val))
+    );
+    vals[name] = val;
+  }
+  return vals;
+}
+
+/* Format a*x with sign-aware coefficient */
+function fmtAx(a) {
+  a = Number(a);
+  if (a === 1)  return 'x';
+  if (a === -1) return '-x';
+  return `${a}x`;
+}
+
+/* Format a*x + b  with sign-aware + / - */
+function fmtAxPlusB(a, b) {
+  a = Number(a); b = Number(b);
+  const ax = fmtAx(a);
+  if (b === 0) return ax;
+  return b < 0 ? `${ax} ${b}` : `${ax} + ${b}`;
+}
+
+/* Format Ax² + Bx + C */
+function fmtQuadratic(a, b, c) {
+  a = Number(a); b = Number(b); c = Number(c);
+  const aStr = a === 1 ? '' : a === -1 ? '-' : `${a}`;
+  let result = `${aStr}x^2`;
+  if (b !== 0) {
+    if      (b ===  1) result += ' + x';
+    else if (b === -1) result += ' - x';
+    else if (b <   0)  result += ` ${b}x`;
+    else               result += ` + ${b}x`;
+  }
+  if (c !== 0) result += c < 0 ? ` ${c}` : ` + ${c}`;
+  return result;
+}
+
+/* Format 2Ax + B (derivative of quadratic) */
+function fmtQuadDeriv(a, b) {
+  return fmtAxPlusB(2 * Number(a), Number(b));
+}
+
+/*
+  Apply template substitution to a string given resolved variable values.
+  Named formatters are matched first; then bare {{X}} replacements.
+*/
+function applyTemplate(str, vals) {
+  if (!str.includes('{{')) return str;
+
+  // Named formatters — order matters (longer patterns first)
+  str = str.replace(/\{\{ax\^2\+bx\+c\}\}/gi, () => {
+    return fmtQuadratic(vals['A'] ?? 1, vals['B'] ?? 0, vals['C'] ?? 0);
+  });
+  str = str.replace(/\{\{2ax\+b\}\}/gi, () => {
+    return fmtQuadDeriv(vals['A'] ?? 1, vals['B'] ?? 0);
+  });
+  str = str.replace(/\{\{ax\+b\}\}/gi, () => {
+    return fmtAxPlusB(vals['A'] ?? 1, vals['B'] ?? 0);
+  });
+  str = str.replace(/\{\{ax\}\}/gi, () => {
+    return fmtAx(vals['A'] ?? 1);
+  });
+
+  // Bare variable substitution: {{A}}, {{B}}, etc.
+  // The [A-Z] pattern intentionally excludes \color and other LaTeX {{ }} uses.
+  str = str.replace(/\{\{([A-Z])\}\}/g, (_, key) => {
+    return vals[key] !== undefined ? vals[key] : `{{${key}}}`;
+  });
+
+  // Safety check: warn in console if any {{ remain that aren't LaTeX \commands
+  // (helps catch typos in deck JSON during development)
+  const suspicious = str.match(/\{\{(?!\\)[^}]/g);
+  if (suspicious) console.warn('applyTemplate: possible unresolved template in:', str);
+
+  return str;
+}
+
+/* Expand a raw card definition into a resolved card (variables rolled & substituted) */
+function resolveCard(rawCard) {
+  const vals = rollVariables(rawCard.variables);
+  return {
+    front: applyTemplate(rawCard.front, vals),
+    back:  applyTemplate(rawCard.back,  vals),
+  };
+}
+
+/* ================================================================
+   DECK LOADING
+================================================================ */
+
+async function loadManifest() {
+  const resp = await fetch('manifest.json');
+  if (!resp.ok) throw new Error(`Could not load manifest.json (${resp.status})`);
+  return resp.json();
+}
+
+async function loadDeck(filename) {
+  const resp = await fetch(filename);
+  if (!resp.ok) throw new Error(`Could not load deck file "${filename}" (${resp.status})`);
+  return resp.json();
+}
+
+/* ================================================================
+   APP STATE
+================================================================ */
+let loadedDecks  = [];   // array of deck metadata objects from JSON
+let selectedDeckIndices = [];
+let deck         = [];   // resolved cards for current game
+let currentIndex = 0;
+let showBack     = false;
+let complete     = false;
+
+const app = document.getElementById('app');
+
+/* ================================================================
+   RENDER
+================================================================ */
+
+function render() {
+  // ---- Loading screen ----
+  if (loadedDecks.length === 0) {
+    app.innerHTML = `
+      <div class="status-box">
+        <div class="text-lg text-slate-500">Loading decks…</div>
+      </div>`;
+    return;
+  }
+
+  // ---- Deck selection ----
+  if (deck.length === 0) {
+    const checkboxes = loadedDecks.map((d, i) => `
+      <label class="flex items-start gap-2 cursor-pointer">
+        <input type="checkbox" value="${i}" class="mt-1"
+          ${selectedDeckIndices.includes(i) ? 'checked' : ''}/>
+        <span>
+          <span class="font-semibold">${escapeHtml(d.deck_name)}</span>
+          ${d.description ? `<br/><span class="text-sm text-slate-500">${escapeHtml(d.description)}</span>` : ''}
+        </span>
+      </label>`).join('');
+
+    const canStart = selectedDeckIndices.length > 0;
+    app.innerHTML = `
+      <div class="w-[28rem] bg-white rounded-2xl shadow-xl p-6 text-left">
+        <h2 class="text-2xl font-semibold mb-4 text-center">Select Decks</h2>
+        <div class="flex flex-col gap-3">${checkboxes}</div>
+        <div class="mt-6 flex justify-center">
+          <button id="startBtn"
+            class="px-6 py-2 text-lg bg-green-600 hover:bg-green-700 text-white rounded-xl
+                   ${canStart ? '' : 'opacity-50 cursor-not-allowed'}">
+            Start
+          </button>
+        </div>
+      </div>`;
+
+    document.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', e => {
+        const idx = parseInt(e.target.value);
+        if (selectedDeckIndices.includes(idx))
+          selectedDeckIndices = selectedDeckIndices.filter(x => x !== idx);
+        else
+          selectedDeckIndices.push(idx);
+        render();
+      });
+    });
+    document.getElementById('startBtn')?.addEventListener('click', () => {
+      if (canStart) startGame();
+    });
+    return;
+  }
+
+  // ---- Complete screen ----
+  if (complete) {
+    app.innerHTML = `
+      <div class="w-[28rem] min-h-[14rem] flex flex-col items-center justify-center gap-4
+                  shadow-xl rounded-2xl bg-white p-6">
+        <div class="text-2xl font-semibold">Deck complete! Restart?</div>
+        <button id="restartBtn"
+          class="px-4 py-2 text-lg bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
+          Restart
+        </button>
+      </div>`;
+    document.getElementById('restartBtn').addEventListener('click', restart);
+    return;
+  }
+
+  // ---- Card screen ----
+  const card    = deck[currentIndex];
+  const isMath  = card.card_type === 'math';
+  const progress = `${currentIndex + 1} / ${deck.length}`;
+  const prevDisabled = currentIndex === 0 ? 'opacity-50 cursor-not-allowed' : '';
+
+  // KaTeX helper — renders a LaTeX string to an HTML string synchronously.
+  // Falls back to the raw LaTeX wrapped in a <code> tag if KaTeX isn't ready
+  // (shouldn't happen in practice since KaTeX loads synchronously).
+  function katexHtml(tex, display = true) {
+    try {
+      return katex.renderToString(tex, { displayMode: display, throwOnError: false });
+    } catch (e) {
+      return `<code>${escapeHtml(tex)}</code>`;
+    }
+  }
+
+  const frontContent = isMath
+    ? `<div class="p-4">${katexHtml(`\\frac{d}{dx}\\Biggl[\\;${card.front}\\;\\Biggr]`)}</div>`
+    : `<div class="text-card-content">${escapeHtml(card.front)}</div>`;
+
+  const backContent = isMath
+    ? `<div class="p-4" style="display:flex;flex-direction:column;align-items:center;gap:0.5rem;">
+         ${katexHtml(`\\frac{d}{dx}\\Biggl[\\;${card.front}\\;\\Biggr]`)}
+         ${katexHtml(`=\\ ${card.back}`)}
+       </div>`
+    : `<div class="text-card-content">
+         <div class="text-slate-500 text-base mb-1">${escapeHtml(card.front)}</div>
+         <div>${escapeHtml(card.back)}</div>
+       </div>`;
+
+  app.innerHTML = `
+    <div class="text-sm text-slate-600 mb-2">Card ${progress}</div>
+    <div class="flip-card ${showBack ? 'flipped' : ''}" id="flipCard">
+      <div class="flip-inner">
+        <div class="flip-face flip-front">${frontContent}</div>
+        <div class="flip-face flip-back">${backContent}</div>
+      </div>
+    </div>
+
+    <div class="w-[28rem] flex justify-center gap-6 mt-4">
+      <div class="flex flex-col items-center">
+        <button id="prevBtn"
+          class="px-4 py-2 text-lg bg-gray-300 hover:bg-gray-400 rounded-xl ${prevDisabled}"
+          ${currentIndex === 0 ? 'disabled' : ''}>Prev. Card</button>
+        <div class="text-xs text-slate-500 mt-1">← = Prev</div>
+      </div>
+      <div class="flex flex-col items-center">
+        <button id="flipBtn"
+          class="px-4 py-2 text-lg rounded-xl border bg-white">
+          ${showBack ? 'Show Question' : 'Show Answer'}
+        </button>
+        <div class="text-xs text-slate-500 mt-1">Space = Flip</div>
+      </div>
+      <div class="flex flex-col items-center">
+        <button id="nextBtn"
+          class="px-4 py-2 text-lg bg-green-500 hover:bg-green-600 text-white rounded-xl">
+          Next Card</button>
+        <div class="text-xs text-slate-500 mt-1">→ = Next</div>
+      </div>
+    </div>`;
+
+  // Wire up buttons
+  const flipCardEl = document.getElementById('flipCard');
+  flipCardEl.classList.toggle('flipped', showBack);
+
+  function toggleFlip() {
+    showBack = !showBack;
+    flipCardEl.classList.toggle('flipped', showBack);
+    document.getElementById('flipBtn').textContent =
+      showBack ? 'Show Question' : 'Show Answer';
+  }
+
+  document.getElementById('flipBtn').addEventListener('click', toggleFlip);
+  document.getElementById('flipCard').addEventListener('click', toggleFlip);
+  document.getElementById('nextBtn').addEventListener('click', nextCard);
+  document.getElementById('prevBtn').addEventListener('click', prevCard);
+
+  // KaTeX rendered synchronously above — nothing async needed here.
+}
+
+/* ================================================================
+   GAME CONTROL
+================================================================ */
+
+function startGame() {
+  let combined = [];
+  for (const idx of selectedDeckIndices) {
+    const deckDef = loadedDecks[idx];
+    const cardType = deckDef.card_type ?? 'text';
+    const resolved = deckDef.cards.map(rawCard => ({
+      ...resolveCard(rawCard),
+      card_type: cardType,
+    }));
+    combined = combined.concat(resolved);
+  }
+  if (!combined.length) return;
+  deck = combined.sort(() => Math.random() - 0.5);
+  currentIndex = 0; showBack = false; complete = false;
+  render();
+}
+
+function nextCard() {
+  if (currentIndex < deck.length - 1) { currentIndex++; showBack = false; render(); }
+  else { complete = true; render(); }
+}
+function prevCard() {
+  if (currentIndex > 0) { currentIndex--; showBack = false; render(); }
+}
+function restart() {
+  deck = []; currentIndex = 0; showBack = false; complete = false;
+  selectedDeckIndices = [];
+  render();
+}
+
+/* ================================================================
+   KEYBOARD
+================================================================ */
+document.addEventListener('keydown', e => {
+  if (!deck.length) return;
+  if (e.code === 'ArrowRight') { e.preventDefault(); nextCard(); }
+  if (e.code === 'ArrowLeft')  { e.preventDefault(); prevCard(); }
+  if (e.code === 'Space') {
+    e.preventDefault();
+    showBack = !showBack;
+    const el = document.getElementById('flipCard');
+    el?.classList.toggle('flipped', showBack);
+    const btn = document.getElementById('flipBtn');
+    if (btn) btn.textContent = showBack ? 'Show Question' : 'Show Answer';
+  }
+});
+
+/* ================================================================
+   UTILITIES
+================================================================ */
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/* ================================================================
+   BOOT — load manifest then all decks
+================================================================ */
+async function boot() {
+  render(); // show "Loading…"
+  try {
+    const manifest = await loadManifest();
+    const results = await Promise.allSettled(
+      manifest.decks.map(filename => loadDeck(filename))
+    );
+
+    const errors = [];
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].status === 'fulfilled') {
+        loadedDecks.push(results[i].value);
+      } else {
+        errors.push(`${manifest.decks[i]}: ${results[i].reason.message}`);
+      }
+    }
+
+    if (loadedDecks.length === 0) {
+      app.innerHTML = `
+        <div class="status-box text-red-600">
+          <div class="font-semibold text-lg">Failed to load any decks.</div>
+          <div class="text-sm mt-1">${errors.map(escapeHtml).join('<br/>')}</div>
+        </div>`;
+      return;
+    }
+
+    if (errors.length) {
+      console.warn('Some decks failed to load:', errors);
+    }
+
+    render();
+  } catch (err) {
+    app.innerHTML = `
+      <div class="status-box text-red-600">
+        <div class="font-semibold text-lg">Could not load manifest.json</div>
+        <div class="text-sm mt-2">${escapeHtml(err.message)}</div>
+        <div class="text-sm text-slate-500 mt-2">
+          Make sure manifest.json is in the same folder as this HTML file<br/>
+          and that you're serving via a local server (not opened directly as a file).
+        </div>
+      </div>`;
+  }
+}
+
+boot();
+</script>
+</body>
+</html>
