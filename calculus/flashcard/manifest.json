@@ -1,0 +1,8 @@
+{
+  "decks": [
+    "deck-basic.json",
+    "deck-tricks.json",
+    "deck-laws.json",
+    "deck-implicit.json"
+  ]
+}

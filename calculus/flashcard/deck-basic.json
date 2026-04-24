@@ -1,0 +1,108 @@
+{
+  "deck_name": "Basic Derivatives",
+  "card_type": "math",
+  "description": "Standard derivative rules including polynomials, trig, exponentials, and logarithms.",
+  "cards": [
+    {
+      "front": "x^n",
+      "back": "n x^{n-1}"
+    },
+    {
+      "front": "{{A}}",
+      "back": "0",
+      "variables": {
+        "A": { "type": "int", "min": -9, "max": 9, "nonzero": true }
+      }
+    },
+    {
+      "front": "{{ax}}",
+      "back": "{{A}}",
+      "variables": {
+        "A": { "type": "int", "min": -9, "max": 9, "nonzero": true }
+      }
+    },
+    {
+      "front": "{{ax+b}}",
+      "back": "{{A}}",
+      "variables": {
+        "A": { "type": "int", "min": -9, "max": 9, "nonzero": true },
+        "B": { "type": "int", "min": -9, "max": 9, "nonzero": true, "notequalto": ["A"] }
+      }
+    },
+    {
+      "front": "{{ax^2+bx+c}}",
+      "back": "{{2ax+b}}",
+      "variables": {
+        "A": { "type": "int", "min": -9, "max": 9, "nonzero": true },
+        "B": { "type": "int", "min": -9, "max": 9, "nonzero": true, "notequalto": ["A"] },
+        "C": { "type": "int", "min": -9, "max": 9, "nonzero": true, "notequalto": ["A", "B"] }
+      }
+    },
+    {
+      "front": "x^{1/2}",
+      "back": "\\frac{1}{2}x^{-1/2}"
+    },
+    {
+      "front": "x^{1/4}",
+      "back": "\\frac{1}{4}x^{-3/4}"
+    },
+    {
+      "front": "\\sqrt{x}",
+      "back": "\\frac{1}{2\\sqrt{x}}"
+    },
+    {
+      "front": "\\frac{1}{\\sqrt{x}}",
+      "back": "-\\frac{1}{2}x^{-3/2}"
+    },
+    {
+      "front": "\\sin(x)",
+      "back": "\\cos(x)"
+    },
+    {
+      "front": "\\cos(x)",
+      "back": "-\\sin(x)"
+    },
+    {
+      "front": "\\tan(x)",
+      "back": "\\sec^2(x)"
+    },
+    {
+      "front": "\\sec(x)",
+      "back": "\\sec(x)\\tan(x)"
+    },
+    {
+      "front": "e^x",
+      "back": "e^x"
+    },
+    {
+      "front": "{{C}}^x",
+      "back": "{{C}}^x\\ln({{C}})",
+      "variables": {
+        "C": { "type": "int", "min": 2, "max": 9 }
+      }
+    },
+    {
+      "front": "\\ln(x)",
+      "back": "\\frac{1}{x}"
+    },
+    {
+      "front": "\\log_{{C}}(x)",
+      "back": "\\frac{1}{x\\ln({{C}})}",
+      "variables": {
+        "C": { "type": "int", "min": 2, "max": 9 }
+      }
+    },
+    {
+      "front": "\\arcsin(x)",
+      "back": "\\frac{1}{\\sqrt{1-x^2}}"
+    },
+    {
+      "front": "\\arctan(x)",
+      "back": "\\frac{1}{x^2+1}"
+    },
+    {
+      "front": "\\mathrm{arcsec}(x)",
+      "back": "\\frac{1}{|x|\\sqrt{x^2-1}}"
+    }
+  ]
+}

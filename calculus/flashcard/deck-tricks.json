@@ -1,0 +1,16 @@
+{
+  "deck_name": "Tricks",
+  "card_type": "math",
+  "description": "Misleading expressions that are constants — their derivatives are zero.",
+  "cards": [
+    { "front": "\\ln(2)",       "back": "0" },
+    { "front": "\\log_2(3)",    "back": "0" },
+    { "front": "e^2",           "back": "0" },
+    { "front": "\\pi",          "back": "0" },
+    { "front": "\\pi^2",        "back": "0" },
+    { "front": "\\sin(2)",      "back": "0" },
+    { "front": "\\arctan(1)",   "back": "0" },
+    { "front": "e^2 + 3x + 1",  "back": "3" },
+    { "front": "2x^2 + 3e + 1", "back": "4x" }
+  ]
+}
