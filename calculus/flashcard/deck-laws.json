@@ -33,15 +33,15 @@
     },
     {
       "front": "\\sin^3( x )",
-      "back": "{\\color{red}3}\\sin^{{\\color{red}2}}(x)\\,\\cdot\\,{\\color{purple}\\cos(x)}"
+      "back": "{\\color{red}3}\\sin^{\\color{red}{2}}(x)\\,\\cdot\\,{\\color{purple}\\cos(x)}"
     },
     {
       "front": "\\tan^3( x )",
-      "back": "{\\color{red}2}\\tan^{{\\color{red}2}}(x)\\,\\cdot\\,{\\color{purple}\\sec^2(x)}"
+      "back": "{\\color{red}2}\\tan^{\\color{red}{2}}(x)\\,\\cdot\\,{\\color{purple}\\sec^2(x)}"
     },
     {
       "front": "\\ln(x^2 + 3x + 4)",
-      "back": "\\frac{{\\color{purple}2x+3}}{x^2+3x+4}"
+      "back": "\\frac{\\color{purple}{2x+3}}{x^2+3x+4}"
     },
     {
       "front": "\\bigl(x^2 + 3x + 4\\bigr)^3",
@@ -49,7 +49,7 @@
     },
     {
       "front": "\\ln\\bigl(\\tan(x)\\bigr)",
-      "back": "\\frac{{\\color{purple}\\sec^2(x)}}{\\tan(x)}"
+      "back": "\\frac{\\color{purple}{\\sec^2(x)}}{\\tan(x)}"
     }
   ]
 }
