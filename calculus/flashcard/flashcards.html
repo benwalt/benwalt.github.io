@@ -145,7 +145,12 @@ function fmtQuadratic(a, b, c) {
   a = Number(a); b = Number(b); c = Number(c);
   const aStr = a === 1 ? '' : a === -1 ? '-' : `${a}`;
   let result = `${aStr}x^2`;
-  if (b !== 0) result += b < 0 ? ` ${b}x` : ` + ${b}x`;
+  if (b !== 0) {
+    if      (b ===  1) result += ' + x';
+    else if (b === -1) result += ' - x';
+    else if (b <   0)  result += ` ${b}x`;
+    else               result += ` + ${b}x`;
+  }
   if (c !== 0) result += c < 0 ? ` ${c}` : ` + ${c}`;
   return result;
 }
