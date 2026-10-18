@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Story Form Explorer</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, sans-serif;
+  color: #111;
+  background: #fff;
+  padding: 1.5rem;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
+#canvas-wrap { position: relative; }
+
+/* ── zoom axis selector overlay ── */
+#zoom-select {
+  position: absolute;
+  top: 8px; left: 8px;
+  display: flex; flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+#zoom-select .zoom-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+  color: rgba(0,0,0,0.5);
+  text-transform: uppercase;
+  margin-bottom: 1px;
+  user-select: none;
+}
+#zoom-select button {
+  width: 36px; height: 30px;
+  border-radius: 5px;
+  border: 1px solid rgba(0,0,0,0.25);
+  background: rgba(255,255,255,0.55);
+  color: rgba(0,0,0,0.7);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.12s;
+  line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+#zoom-select button:hover  { background: rgba(255,255,255,0.75); }
+#zoom-select button.active { background: rgba(0,0,0,0.65); border-color: rgba(0,0,0,0.7); color: #fff; }
+
+/* ── formula panel ── */
+#formula-display {
+  margin-top: 0.85rem;
+  padding: 0.85rem 1.1rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+  border: 0.5px solid #ddd;
+  min-height: 6.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: auto;
+}
+#formula-display .katex { font-size: 1.35em; }
+
+/* ── action buttons (export / share) ── */
+#action-row { display: flex; gap: 8px; margin-top: 0.75rem; }
+#action-row button {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 13px;
+  font-size: 13px; font-weight: 500;
+  border-radius: 7px;
+  border: 0.5px solid #bbb;
+  background: transparent; color: #333;
+  cursor: pointer; transition: background 0.13s;
+}
+#action-row button:hover { background: #f0f0f0; }
+#action-row button.copied { background: #d4edda; border-color: #82c99a; color: #1a6b32; }
+
+#hint { margin-top: 0.6rem; font-size: 11px; color: #999; }
+
+/* ── function-type buttons (combined explorers only) ── */
+#mode-row { display: none; gap: 6px; margin-bottom: 0.85rem; }
+#mode-row button {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 14px; font-weight: 500;
+  border-radius: 8px;
+  border: 0.5px solid #aaa;
+  background: transparent; color: #111;
+  cursor: pointer; transition: background 0.15s;
+}
+#mode-row button:hover { background: #f0f0f0; }
+#mode-row button.active { background: #111; color: #fff; border-color: #111; }
+
+/* ── integer-lock switch (shown only for tools that support it) ── */
+#int-lock {
+  margin-left: auto;
+  display: none; align-items: center; gap: 8px;
+  font-size: 13px; color: #555;
+  cursor: pointer; user-select: none;
+}
+#int-lock .track {
+  position: relative; width: 40px; height: 22px; border-radius: 11px;
+  background: #ccc; transition: background 0.2s; flex-shrink: 0;
+}
+#int-lock .thumb {
+  position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: left 0.2s;
+}
+#int-lock.on .track { background: #185FA5; }
+#int-lock.on .thumb { left: 20px; }
+#int-lock.on { color: #185FA5; font-weight: 600; }
+
+@media (prefers-color-scheme: dark) {
+  body { background: #1a1a1a; color: #eee; }
+  #zoom-select .zoom-label { color: rgba(255,255,255,0.7); }
+  #zoom-select button {
+    border-color: rgba(255,255,255,0.35);
+    background: rgba(0,0,0,0.28);
+    color: rgba(255,255,255,0.85);
+  }
+  #zoom-select button:hover  { background: rgba(0,0,0,0.45); }
+  #zoom-select button.active { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.7); color: #fff; }
+  #formula-display { background: #242424; border-color: #333; color: #eee; }
+  #action-row button { border-color: #555; color: #ccc; }
+  #action-row button:hover { background: #2a2a2a; }
+  #action-row button.copied { background: #1a3d25; border-color: #3a8a52; color: #7dcf97; }
+  #hint { color: #777; }
+  #mode-row button { border-color: #555; color: #eee; }
+  #mode-row button:hover { background: #2a2a2a; }
+  #mode-row button.active { background: #eee; color: #111; border-color: #eee; }
+  #int-lock { color: #aaa; }
+  #int-lock .track { background: #444; }
+  #int-lock.on { color: #85B7EB; }
+}
+</style>
+</head>
+<body>
+
+<div id="mode-row"></div>
+
+<div id="canvas-wrap">
+  <canvas id="plot"></canvas>
+  <div id="zoom-select">
+    <div class="zoom-label">Zoom</div>
+    <button id="zoom-xy" class="active" title="Scroll to zoom both axes">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <line x1="1" y1="8" x2="15" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <polyline points="4,5 1,8 4,11" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+        <polyline points="12,5 15,8 12,11" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+        <line x1="8" y1="1" x2="8" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <polyline points="5,4 8,1 11,4" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+        <polyline points="5,12 8,15 11,12" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </button>
+    <button id="zoom-x" title="Scroll to zoom x-axis only">&#x2194;</button>
+    <button id="zoom-y" title="Scroll to zoom y-axis only">&#x2195;</button>
+  </div>
+</div>
+
+<div id="formula-display"><span id="formula-math"></span></div>
+
+<div id="action-row">
+  <button id="btn-export">&#x2193; Export PNG</button>
+  <button id="btn-share">&#x1F517; Copy link</button>
+  <div id="int-lock" role="switch" aria-checked="false" tabindex="0" title="Lock all values to integers">
+    <span>Integers only</span>
+    <div class="track"><div class="thumb"></div></div>
+  </div>
+</div>
+
+<div id="hint">Drag the colored points &nbsp;·&nbsp; Drag empty space to pan &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Double-click to reset view</div>
+
+<script>
+'use strict';
+// ═════════════════════════════════════════════════════════════════
+//  TOOL DEFINITION  (the only part that differs between explorers)
+// ═════════════════════════════════════════════════════════════════
+// "Story" form  (v3: used by story_explorer_v2.html)
+//   line:         f(x) = h + m·((x − k)/n)    = (m/n)x + (h − mk/n)                      exact fractions
+//   quadratic:    f(x) = h + m·((x − k)/n)²   = (m/n²)x² − (2mk/n²)x + (h + mk²/n²)       2 decimals
+//   exponential:  f(x) = h · m^((x − k)/n)    ≈ a·bˣ,  a = h·m^(−k/n),  b = m^(1/n)        2 decimals / sci
+// Handles:  red   (k, h)          free     — moves the whole picture
+//           green (k + n, h)      x only   — sets n  (never 0); its bar also grabs it
+//           blue  (k + n, f(k+n)) y only   — sets m;              its bar also grabs it
+// Page state the tool needs (integer switch, hovered handles, snapping steps) comes in through `api`.
+
+function makeStory(kind){
+  const u = (S, x) => (x - S.k) / S.n;
+  const f = kind === 'line'      ? (S, x) => S.h + S.m * u(S, x)
+          : kind === 'quadratic' ? (S, x) => S.h + S.m * u(S, x) ** 2
+          :                        (S, x) => S.h * Math.pow(S.m, u(S, x));
+  const blueY = S => kind === 'exponential' ? S.h * S.m : S.h + S.m;
+
+  // defaults chosen by dot position: red (1, 2), green (3, 2), blue (3, 5)
+  const VIEW = { xMin: -1.81, xMax: 5.11, yMin: -1.1, yMax: 5.76 };
+  const cfg = {
+    line:        { title: 'Line Explorer — Story Form',        defaults: { h: 2, k: 1, m: 3,   n: 2 } },
+    quadratic:   { title: 'Quadratic Explorer — Story Form',   defaults: { h: 2, k: 1, m: 3,   n: 2 } },
+    exponential: { title: 'Exponential Explorer — Story Form', defaults: { h: 2, k: 1, m: 2.5, n: 2 } },
+  }[kind];
+
+  // ── text helpers ──
+  const MINUS  = '−';
+  const fmtU   = v => String(parseFloat(v.toFixed(4)));
+  const signed = v => v > 0 ? '+' + fmtU(v) : v < 0 ? MINUS + fmtU(-v) : '0';
+  const plain  = v => v < 0 ? MINUS + fmtU(-v) : fmtU(v);
+  const r2     = v => Math.round(v * 100) / 100;
+
+  // ── exact rational arithmetic (BigInt, so nothing overflows) ──
+  const decimals = v => { const s = String(parseFloat(v.toFixed(6))); const i = s.indexOf('.'); return i < 0 ? 0 : s.length - i - 1; };
+  const babs = a => a < 0n ? -a : a;
+  const gcd  = (a, b) => { a = babs(a); b = babs(b); while(b){ [a, b] = [b, a % b]; } return a || 1n; };
+  function frac(P, Q){                         // reduced P/Q
+    if(Q < 0n){ P = -P; Q = -Q; }
+    const g = gcd(P, Q); P /= g; Q /= g;
+    return { zero: P === 0n, neg: P < 0n, one: babs(P) === Q, num: babs(P), den: Q,
+             tex: Q === 1n ? String(babs(P)) : `\\frac{${babs(P)}}{${Q}}` };
+  }
+  function scaled(S){                          // parameters as integers over 10^d
+    const d = Math.max(...['h', 'k', 'm', 'n'].map(key => decimals(S[key])));
+    const s = Math.pow(10, d), I = v => BigInt(Math.round(v * s));
+    return { H: I(S.h), K: I(S.k), M: I(S.m), N: I(S.n), s: BigInt(s) };
+  }
+  // polynomial from [coefficient, power] pairs (zero terms dropped, ±1 hidden)
+  function polyTex(terms){
+    let out = '';
+    for(const [c, p] of terms){
+      if(c.zero) continue;
+      const v = p === 0 ? c.tex : (c.one ? '' : c.tex) + (p === 1 ? 'x' : `x^{${p}}`);
+      out += out ? ` ${c.neg ? '-' : '+'} ${v}` : (c.neg ? '-' : '') + v;
+    }
+    return out || '0';
+  }
+
+  // exponential coefficients: 2 decimals while that captures the number
+  // (non-zero and within 5%, and below 10⁴); otherwise scientific notation
+  function expNum(v){
+    if(v === 0) return { tex: '0', val: 0, sci: false };
+    const a = Math.abs(v), f = r2(v);
+    if(a < 1e4 && f !== 0 && Math.abs(f - v) <= 0.05 * a) return { tex: String(f), val: f, sci: false };
+    let e = Math.floor(Math.log10(a)), mant = r2(v / Math.pow(10, e));
+    if(Math.abs(mant) >= 10){ e += 1; mant = r2(mant / 10); }
+    return { tex: `${mant} \\times 10^{${e}}`, val: mant * Math.pow(10, e), sci: true };
+  }
+  const close = (x, v) => Math.abs(x - v) <= 1e-9 * Math.max(1, Math.abs(v));
+
+  function simplified(S){
+    if(kind === 'exponential'){
+      const a = S.h * Math.pow(S.m, -S.k / S.n), b = Math.pow(S.m, 1 / S.n);
+      if(a === 0) return { rel: '=', tex: '0' };
+      const A = expNum(a);
+      let B = expNum(b);
+      if(B.tex === '1' && b !== 1){              // b ≈ 1: show enough decimals to see it isn't 1
+        const d = Math.min(8, Math.ceil(-Math.log10(Math.abs(b - 1))) + 1);
+        const v = parseFloat(b.toFixed(d));
+        B = { tex: String(v), val: v, sci: false };
+      }
+      const bx = B.sci ? `\\left(${B.tex}\\right)^{x}` : `${B.tex}^{x}`;
+      const tex = A.tex === '1' ? bx : A.tex === '-1' ? `-${bx}` : `${A.tex} \\cdot ${bx}`;
+      return { rel: close(A.val, a) && close(B.val, b) ? '=' : '\\approx', tex };
+    }
+    const { H, K, M, N, s } = scaled(S);
+    if(kind === 'line'){
+      return { rel: '=', tex: polyTex([[frac(M, N), 1], [frac(H * N - M * K, s * N), 0]]) };
+    }
+    // quadratic: 2 decimals ("=" only when that is exact)
+    const cs = [frac(M * s, N * N), frac(-2n * M * K, N * N), frac(H * N * N + M * K * K, s * N * N)];
+    const exact = cs.every(c => (c.num * 100n) % c.den === 0n);
+    const terms = cs.map((c, i) => {
+      const v = Math.round(Number(c.num * 100n) / Number(c.den)) / 100;
+      return [{ zero: v === 0, neg: c.neg, one: v === 1, tex: String(v) }, 2 - i];
+    });
+    return { rel: exact ? '=' : '\\approx', tex: polyTex(terms) };
+  }
+
+  // exponential base m written exactly in integer mode (m = blue height / h)
+  function intBaseTex(S){
+    let q;
+    if(S.h !== 0) q = frac(BigInt(Math.round(S.h * S.m)), BigInt(S.h));
+    else {                                       // h = 0: m is remembered, find a small fraction
+      let d = 1;
+      while(d < 1000 && Math.abs(S.m * d - Math.round(S.m * d)) > 1e-6) d++;
+      q = frac(BigInt(Math.round(S.m * d)), BigInt(d));
+    }
+    return q.den === 1n ? q.tex : `\\left(${q.tex}\\right)`;
+  }
+
+  // ── tooltip box drawn on the canvas ──
+  function label(g, lines, ax, ay, side, color, C, api, gap = 12){
+    g.save();
+    g.font = '600 14px system-ui, sans-serif';
+    const padX = 7, padY = 5, lh = 18;
+    const w = Math.max(...lines.map(t => g.measureText(t).width)) + 2 * padX;
+    const h = lines.length * lh + 2 * padY - 4;
+    const [vert, horiz] = side.includes('-') ? side.split('-')
+                        : side === 'above' || side === 'below' ? [side, 'center'] : ['middle', side];
+    let x = horiz === 'right' ? ax + gap : horiz === 'left' ? ax - gap - w : ax - w / 2;
+    let y = vert === 'below' ? ay + gap : vert === 'above' ? ay - gap - h : ay - h / 2;
+    x = api.clamp(x, 2, api.W - w - 2);
+    y = api.clamp(y, 2, api.H - h - 2);
+    g.fillStyle = C.dark ? 'rgba(36,36,36,0.85)' : 'rgba(255,255,255,0.85)';
+    g.strokeStyle = color[1]; g.lineWidth = 1.5;
+    g.beginPath(); g.roundRect(x, y, w, h, 6); g.fill(); g.stroke();
+    g.fillStyle = C.dark ? color[0] : color[1];
+    g.textBaseline = 'top'; g.textAlign = 'left';
+    lines.forEach((t, i) => g.fillText(t, x + padX, y + padY + i * lh));
+    g.restore();
+  }
+
+  function blueText(S){
+    if(kind !== 'exponential') return 'f: ' + signed(S.m);
+    if(S.m >= 1) return 'f: ×' + String(r2(S.m));
+    return 'f: ÷' + String(r2(1 / S.m));            // decay: divide by 1/m
+  }
+
+  // ── exponential validity helpers ──
+  // integer height for the blue dot: same side of the axis as h, never 0
+  const intBlueY = (y, h) => { const Y = Math.round(y); return Math.sign(Y) === Math.sign(h) ? Y : Math.sign(h); };
+  // smallest multiplier allowed (non-integer mode); also the blue drag's snapping step
+  const minM = (h, api) => api.clamp(api.decStep(api.stepY() / Math.abs(h)), 0.01, 0.1);
+
+  const story = {
+    kind,
+    title: cfg.title,
+    file: kind + '_story',
+    keys: ['h', 'k', 'm', 'n'],
+    defaults: cfg.defaults,
+    view: VIEW,
+    f,
+    lastM: cfg.defaults.m,       // exponential: multiplier remembered while h = 0
+
+    validate: S => S.n !== 0 && (kind !== 'exponential' || S.m > 0),
+
+    // dot positions ↔ parameters (used when switching function type)
+    toDots: S => ({ rx: S.k, ry: S.h, gx: S.k + S.n, by: blueY(S) }),
+    fromDots(d, S, api){
+      S.k = d.rx; S.h = d.ry; S.n = d.gx - d.rx;
+      if(kind !== 'exponential'){
+        S.m = api.intMode ? Math.round(d.by - d.ry) : parseFloat((d.by - d.ry).toFixed(6));
+      } else if(S.h === 0){
+        S.m = story.lastM;                                   // blue must sit on the axis with red
+      } else if(api.intMode){
+        S.m = intBlueY(d.by, S.h) / S.h;                     // integer height, valid side
+      } else {
+        S.m = Math.sign(d.by) === Math.sign(S.h) ? d.by / S.h  // same place
+                                                 : minM(S.h, api);   // just inside the valid side
+      }
+    },
+
+    // "Integers only" switched on
+    roundToInt(S){
+      const r = v => Math.round(v) || 0;
+      const yb = blueY(S);                                   // blue height before rounding
+      S.h = r(S.h); S.k = r(S.k);
+      S.n = r(S.n) || (Math.sign(S.n) || 1);
+      if(kind !== 'exponential') S.m = r(S.m);
+      else if(S.h !== 0) S.m = intBlueY(yb, S.h) / S.h;
+    },
+
+    over(g, S, api, C){
+      const { X, Y } = api;
+      const x1 = S.k + S.n;
+      g.lineCap = 'butt';
+      g.strokeStyle = C.green[0];
+      g.lineWidth = api.active.has('green') ? 8 : 6;
+      g.beginPath(); g.moveTo(X(S.k), Y(S.h)); g.lineTo(X(x1), Y(S.h)); g.stroke();
+      g.strokeStyle = C.blue[0];
+      g.lineWidth = api.active.has('blue') ? 8 : 6;
+      g.beginPath(); g.moveTo(X(x1), Y(S.h)); g.lineTo(X(x1), Y(blueY(S))); g.stroke();
+    },
+
+    // list order = drawing order (last is on top)
+    handles(S, api){
+      const { snap } = api;
+      const stepX = () => api.intMode ? 1 : api.stepX();
+      const stepY = () => api.intMode ? 1 : api.stepY();
+      const x1 = S.k + S.n;
+      return [
+        { id: 'blue', color: 'blue', axis: 'y', x: x1, y: blueY(S),
+          seg: [x1, S.h, x1, blueY(S)],
+          disabled: kind === 'exponential' && S.h === 0,     // m is invisible when h = 0
+          drag(tx, ty){
+            if(kind !== 'exponential'){ S.m = snap(ty - S.h, stepY()); return; }   // m = 0 allowed
+            if(S.h === 0) return;
+            if(api.intMode){ S.m = intBlueY(ty, S.h) / S.h; return; }             // blue on an integer
+            const sm = minM(S.h, api);
+            S.m = Math.max(snap(ty / S.h, sm), sm);                               // multiplier > 0
+          } },
+        { id: 'green', color: 'green', axis: 'x', x: x1, y: S.h,
+          seg: [S.k, S.h, x1, S.h],
+          drag(tx){
+            const s = stepX();
+            let n = snap(tx - S.k, s);
+            if(n === 0) n = Math.sign(S.n) * s;                 // never a zero-length run
+            S.n = n;
+          } },
+        { id: 'red', color: 'red', r: 9, axis: 'xy', x: S.k, y: S.h,
+          drag(tx, ty, start){
+            S.k = snap(tx, stepX());
+            S.h = snap(ty, stepY());
+            // integer exponential: keep the blue dot on an integer as h changes
+            // (computed from the m at drag start, so passing through h = 0 loses nothing)
+            if(api.intMode && kind === 'exponential'){
+              S.m = S.h !== 0 ? intBlueY(S.h * start.m, S.h) / S.h : start.m;
+            }
+          } },
+      ];
+    },
+
+    labels(g, S, api, C, active){
+      const { X, Y } = api;
+      const x1 = S.k + S.n, yb = blueY(S);
+      const up = yb >= S.h;                                   // blue dot at or above green dot
+      const overlap = Math.abs(Y(yb) - Y(S.h)) < 14;
+      const showBlue  = active.has('blue')  || (overlap && active.has('green'));
+      const showGreen = active.has('green') || (overlap && active.has('blue'));
+      if(showGreen){
+        label(g, ['x: ' + signed(S.n)], X(S.k + S.n / 2), Y(S.h),
+              up ? 'below' : 'above', C.green, C, api);
+      }
+      if(showBlue){
+        label(g, [blueText(S)], X(x1), (Y(S.h) + Y(yb)) / 2,
+              S.n > 0 ? 'right' : 'left', C.blue, C, api);
+      }
+      if(active.has('red')){
+        const side = kind === 'quadratic'
+          ? (S.m >= 0 ? 'below' : 'above')                                 // outside the parabola
+          : (up ? 'above-' : 'below-') + (S.n > 0 ? 'left' : 'right');      // away from bars & curve
+        label(g, ['f = ' + plain(S.h), 'x = ' + plain(S.k)], X(S.k), Y(S.h), side, C.red, C, api, 18);
+      }
+    },
+
+    tex(S, col, fmt, api){
+      const h = col('red', fmt(S.h));
+      const k = col('red', `x ${S.k < 0 ? '+' : '-'} ${fmt(Math.abs(S.k))}`);   // the whole x − k is red
+      const n = col('green', fmt(S.n));
+      let line1;
+      if(kind === 'exponential'){
+        const base = api.intMode ? intBaseTex(S) : fmt(S.m);
+        line1 = `${h} \\cdot ${col('blue', base)}^{\\left(\\dfrac{${k}}{${n}}\\right)}`;
+      } else {
+        const m = `${S.m < 0 ? '-' : '+'} ${col('blue', fmt(Math.abs(S.m)))}`;
+        line1 = `${h} ${m}\\left(\\dfrac{${k}}{${n}}\\right)${kind === 'quadratic' ? '^{2}' : ''}`;
+      }
+      const simp = simplified(S);
+      // "f(x) = h" in red: f takes the value h at x = k  (= kept a relation for spacing)
+      return `\\begin{aligned} ${col('red', 'f(x)')} &\\mathrel{${col('red', '=')}} ${line1} \\\\[6pt] &${simp.rel} ${simp.tex} \\end{aligned}`;
+    },
+  };
+  return story;
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  COMBINED STORY EXPLORER: one page, three function types
+//  Linear ↔ Quadratic keep h, k, m, n.
+//  To/from Exponential keep the three dot positions (each type converts
+//  through toDots / fromDots); an invalid blue dot for the exponential is
+//  moved to the nearest valid height.
+// ═════════════════════════════════════════════════════════════════
+const STORIES = {
+  line:        makeStory('line'),
+  quadratic:   makeStory('quadratic'),
+  exponential: makeStory('exponential'),
+};
+let storyMode = 'line';
+
+// pairs of types that share parameter meaning (switch by values, not dots)
+const SAME_PARAMS = new Set(['line>quadratic', 'quadratic>line']);
+
+const MODE_API = {
+  modes: [['line', 'Linear'], ['quadratic', 'Quadratic'], ['exponential', 'Exponential']],
+  get mode(){ return storyMode; },
+  setModeRaw(id){ storyMode = id; },
+
+  switchMode(id, S, api){
+    const from = STORIES[storyMode], to = STORIES[id];
+    if(from.kind === 'exponential') from.lastM = S.m;
+    if(!SAME_PARAMS.has(`${storyMode}>${id}`)) to.fromDots(from.toDots(S), S, api);
+    storyMode = id;
+  },
+};
+
+const TOOL = new Proxy({}, {
+  get: (_, p) => (p in MODE_API ? MODE_API[p] : STORIES[storyMode][p]),
+});
+
+// ═════════════════════════════════════════════════════════════════
+//  SHARED GRAPHING CORE  (adapted from rational_explorer.html)
+// ═════════════════════════════════════════════════════════════════
+const S = { ...TOOL.defaults };            // current parameters
+let intMode = false;                       // "Integers only" switch (tools read this)
+let xMin, xMax, yMin, yMax;
+function resetView(){ ({ xMin, xMax, yMin, yMax } = TOOL.view); }
+resetView();
+
+// grab sizes in CSS px; fingers (and smartboard touches) get larger targets
+let touchInput = false;
+const HIT    = () => touchInput ? 24 : 14;   // dots
+const VLINE  = () => touchInput ? 14 : 8;    // vertical-line handles (half-width)
+const SEG    = () => touchInput ? 12 : 7;    // bars (half-width)
+
+// zoom limits: each axis span stays within [SPAN_MIN, SPAN_MAX]
+const SPAN_MIN = 1e-3, SPAN_MAX = 1e6, COORD_MAX = 1e7;
+const DIR_THRESH = 4;    // CSS px of motion before resolving overlapping handles
+
+// ── canvas (sharp on hi-DPI screens: drawing is done in CSS px) ──
+const canvas = document.getElementById('plot');
+const ctx    = canvas.getContext('2d');
+let W = 0, H = 0;
+function setCanvasSize(){
+  W = document.getElementById('canvas-wrap').clientWidth;
+  H = Math.round(W * 3/4);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+const X    = x  => (x - xMin) / (xMax - xMin) * W;
+const Y    = y  => (1 - (y - yMin) / (yMax - yMin)) * H;
+const invX = px => xMin + px / W * (xMax - xMin);
+const invY = py => yMin + (1 - py / H) * (yMax - yMin);
+
+// ── numbers & snapping ──
+const decStep = v => Math.pow(10, Math.floor(Math.log10(v)));
+const clamp   = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+function snap(v, s){
+  const d = Math.max(0, Math.ceil(-Math.log10(s) - 1e-9));
+  const r = parseFloat((Math.round(v / s) * s).toFixed(d));
+  return r === 0 ? 0 : r;                      // no negative zero
+}
+// snapping step tracks the zoom level: 0.1 at the default view
+const stepX = () => decStep((xMax - xMin) / 50);
+const stepY = () => decStep((yMax - yMin) / 50);
+function fmt(v){
+  if(Math.abs(v) < 1e-12) return '0';
+  // 4 decimal places normally; more only for tiny values (deep zoom)
+  return String(parseFloat(v.toFixed(Math.abs(v) < 0.01 ? 6 : 4)));
+}
+
+// ── colors ──
+let forceLight = false;   // set during PNG export
+function isDark(){ return !forceLight && window.matchMedia('(prefers-color-scheme: dark)').matches; }
+function getColors(){
+  const d = isDark();
+  return {
+    dark:   d,
+    axis:   d ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.15)',
+    grid:   d ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+    text:   d ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)',
+    bg:     d ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+    curve:  d ? '#E4E8EC' : '#0D2A3A',
+    // parameter colors: [fill, stroke]; formula uses stroke (light) / fill (dark)
+    red:    d ? ['#F09595', '#E24B4A'] : ['#E8403E', '#A32D2D'],
+    blue:   d ? ['#7FB8E0', '#3D8BC0'] : ['#2A7AB0', '#174E73'],
+    green:  d ? ['#8FD48F', '#4FA84F'] : ['#45A845', '#24672A'],
+    purple: d ? ['#C9A0E8', '#9B59B6'] : ['#9B59B6', '#6C3483'],
+  };
+}
+function texColor(name){ const c = getColors()[name]; return isDark() ? c[0] : c[1]; }
+
+// everything a tool needs from the page, passed explicitly
+const api = { X, Y, invX, invY, snap, decStep, clamp, stepX, stepY,
+              get W(){ return W; }, get H(){ return H; },
+              get intMode(){ return intMode; },          // "Integers only" switch
+              get active(){ return activeIds; } };       // hovered / dragged handle ids
+
+// ─────────────────────────────────────────────────────────────────
+//  DRAW
+// ─────────────────────────────────────────────────────────────────
+function niceTick(span){
+  const rough = span / 7;
+  const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+  for(const m of [1, 2, 5, 10]) if(mag * m >= rough) return mag * m;
+  return mag * 10;
+}
+function fmtTick(v){
+  if(Math.abs(v) < 1e-9) return '';
+  const r = Math.round(v * 1e6) / 1e6;
+  return Number.isInteger(r) ? String(r) : String(parseFloat(r.toPrecision(4)));
+}
+
+function draw(g){
+  const C = getColors();
+  g.clearRect(0, 0, W, H);
+  if(forceLight){ g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H); }
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+
+  // grid
+  // tick positions by integer index (never an endless loop, at most ~200 lines)
+  const ticks = (lo, hi, t) => {
+    const out = [], i0 = Math.ceil(lo / t - 1e-6), i1 = Math.floor(hi / t + 1e-6);
+    for(let i = i0; i <= i1 && out.length < 200; i++) out.push(i * t);
+    return out;
+  };
+  const xTick = niceTick(xMax - xMin), yTick = niceTick(yMax - yMin);
+  const xs = ticks(xMin, xMax, xTick), ys = ticks(yMin, yMax, yTick);
+  g.strokeStyle = C.grid; g.lineWidth = 1;
+  for(const x of xs){ const px = X(x); g.beginPath(); g.moveTo(px, 0); g.lineTo(px, H); g.stroke(); }
+  for(const y of ys){ const py = Y(y); g.beginPath(); g.moveTo(0, py); g.lineTo(W, py); g.stroke(); }
+
+  // axes
+  const ox = X(0), oy = Y(0);
+  g.strokeStyle = C.axis; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(0, oy); g.lineTo(W, oy); g.stroke();
+  g.beginPath(); g.moveTo(ox, 0); g.lineTo(ox, H); g.stroke();
+
+  // tick labels (kept on screen when an axis scrolls out of view)
+  g.fillStyle = C.text; g.font = '14px system-ui,sans-serif';
+  g.textAlign = 'center';
+  const lblY = clamp(oy + 16, 16, H - 4);
+  for(const x of xs){
+    if(Math.abs(x) < xTick * 0.01) continue;
+    g.fillText(fmtTick(x), X(x), lblY);
+  }
+  g.textAlign = 'right';
+  const lblX = clamp(ox - 6, 30, W - 4);
+  for(const y of ys){
+    if(Math.abs(y) < yTick * 0.01) continue;
+    g.fillText(fmtTick(y), lblX, Y(y) + 5);
+  }
+
+  g.save();
+  g.beginPath(); g.rect(0, 0, W, H); g.clip();
+
+  // layer 1: tool decorations under the curve
+  if(TOOL.under) TOOL.under(g, S, api, C);
+
+  // layer 2: the curve
+  const span = yMax - yMin, lo = yMin - 10 * span, hi = yMax + 10 * span;
+  g.strokeStyle = C.curve; g.lineWidth = 3.5; g.lineJoin = 'round'; g.lineCap = 'round';
+  const steps = Math.ceil(W * 2);
+  let pen = false;
+  g.beginPath();
+  for(let i = 0; i <= steps; i++){
+    const x = xMin + (i / steps) * (xMax - xMin);
+    const y = TOOL.f(S, x);
+    if(!isFinite(y)){ pen = false; continue; }
+    const py = Y(clamp(y, lo, hi)), px = X(x);
+    if(!pen){ g.moveTo(px, py); pen = true; } else g.lineTo(px, py);
+  }
+  g.stroke();
+
+  // layer 3: tool decorations over the curve (segments etc.)
+  if(TOOL.over) TOOL.over(g, S, api, C);
+  g.restore();
+
+  // layer 4: handles, in list order (last = on top)
+  for(const h of TOOL.handles(S, api)){
+    if(h.kind === 'vline') continue;           // drawn by the tool itself
+    const [fill, stroke] = C[h.color];
+    const px = X(h.x), py = Y(h.y), r = h.r || 7;
+    g.save();
+    if(h.disabled) g.globalAlpha = 0.45;
+    g.beginPath(); g.arc(px, py, r, 0, 2 * Math.PI);
+    g.fillStyle = fill; g.fill();
+    g.strokeStyle = stroke; g.lineWidth = 2; g.stroke();
+    g.restore();
+  }
+
+  // layer 5: direction arrows for the hovered / dragged handle(s)
+  for(const h of TOOL.handles(S, api)){
+    if(!activeIds.has(h.id)) continue;
+    drawArrows(g, h, C);
+  }
+
+  // layer 6: tool tooltips / labels (top-most)
+  if(TOOL.labels) TOOL.labels(g, S, api, C, activeIds);
+}
+
+function drawArrows(g, h, C){
+  const stroke = C[h.color][1];
+  const r = (h.r || 7) + 5, L = 11;
+  const px = h.kind === 'vline' ? X(h.x) : X(h.x);
+  const py = h.kind === 'vline' ? H - 22 : Y(h.y);
+  const dirs = h.axis === 'x' ? [[1,0],[-1,0]] : h.axis === 'y' ? [[0,-1],[0,1]] : [[1,0],[-1,0],[0,-1],[0,1]];
+  g.save();
+  g.strokeStyle = stroke; g.fillStyle = stroke; g.lineWidth = 2;
+  for(const [dx, dy] of dirs){
+    const x0 = px + dx * r, y0 = py + dy * r, x1 = px + dx * (r + L), y1 = py + dy * (r + L);
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+    g.beginPath();
+    g.moveTo(x1 + dx * 4, y1 + dy * 4);
+    g.lineTo(x1 - dy * 4, y1 + dx * 4);
+    g.lineTo(x1 + dy * 4, y1 - dx * 4);
+    g.closePath(); g.fill();
+  }
+  g.restore();
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  FORMULA (KaTeX)
+// ─────────────────────────────────────────────────────────────────
+function col(name, s){ return `\\textcolor{${texColor(name)}}{${s}}`; }
+function updateFormula(){
+  const el = document.getElementById('formula-math');
+  let tex;
+  try { tex = TOOL.tex(S, col, fmt, api); }
+  catch(e){ tex = '\\text{(formula unavailable for these values)}'; }
+  if(window.katex) katex.render(tex, el, { displayMode: true, throwOnError: false });
+  else el.textContent = tex;
+}
+
+function render(){ draw(ctx); updateFormula(); }
+
+// ─────────────────────────────────────────────────────────────────
+//  HIT TESTING with layers
+//  All handles within the grab radius whose distance is close to the
+//  nearest one are candidates.  One candidate → grab it.  Several
+//  (overlapping handles) → wait for the first few px of motion and give
+//  it to the topmost handle whose drag direction matches the motion.
+// ─────────────────────────────────────────────────────────────────
+function candidates(px, py){
+  const hs = TOOL.handles(S, api);
+  const found = [];
+  for(let i = hs.length - 1; i >= 0; i--){        // topmost first
+    const h = hs[i];
+    if(h.disabled) continue;
+    let d;
+    if(h.kind === 'vline'){
+      d = Math.abs(px - X(h.x)) + 3;               // lines yield to dots
+      if(d > VLINE() + 3) continue;
+    } else {
+      d = Math.hypot(px - X(h.x), py - Y(h.y));
+      if(d > HIT()) continue;
+    }
+    found.push({ h, d });
+  }
+  // bars: handles may carry a `seg` [x1,y1,x2,y2] that also grabs them,
+  // but only when no dot is under the pointer (dots always win)
+  if(!found.length){
+    for(let i = hs.length - 1; i >= 0; i--){
+      const h = hs[i];
+      const segs = h.segs || (h.seg ? [h.seg] : []);       // one bar or several
+      if(h.disabled || !segs.length) continue;
+      const d = Math.min(...segs.map(sg => segDist(px, py, sg)));
+      if(d <= SEG()) found.push({ h, d });
+    }
+  }
+  if(!found.length) return [];
+  const dMin = Math.min(...found.map(f => f.d));
+  return found.filter(f => f.d <= dMin + 6).map(f => f.h);
+}
+
+function segDist(px, py, [x1, y1, x2, y2]){
+  const ax = X(x1), ay = Y(y1), bx = X(x2), by = Y(y2);
+  const vx = bx - ax, vy = by - ay, L2 = vx * vx + vy * vy;
+  const t = L2 ? clamp(((px - ax) * vx + (py - ay) * vy) / L2, 0, 1) : 0;
+  return Math.hypot(px - (ax + t * vx), py - (ay + t * vy));
+}
+
+function chooseByDirection(cands, dx, dy){
+  const dir = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+  return cands.find(h => h.axis === dir)
+      || cands.find(h => h.axis === 'xy')
+      || cands[0];
+}
+
+let drag = null;      // { id, offX, offY, start }
+let pending = null;   // { cands, px, py }
+let panning = null;   // { mx, my }
+let activeIds = new Set();
+
+function getPos(e){
+  const r = canvas.getBoundingClientRect();
+  return [e.clientX - r.left, e.clientY - r.top];
+}
+
+function startDrag(h, px, py){
+  drag = { id: h.id,
+           offX: X(h.x) - px,
+           offY: h.kind === 'vline' ? 0 : Y(h.y) - py,
+           start: { ...S } };
+  activeIds = new Set([h.id]);
+  canvas.style.cursor = 'grabbing';
+}
+
+function doDrag(px, py){
+  const h = TOOL.handles(S, api).find(q => q.id === drag.id);
+  if(!h || h.disabled) return;
+  h.drag(invX(px + drag.offX), invY(py + drag.offY), drag.start);
+  if(TOOL.onEdit) TOOL.onEdit();
+  render();
+}
+
+function cursorFor(cands){
+  if(!cands.length) return 'default';
+  if(cands.length > 1) return 'grab';
+  return cands[0].axis === 'x' ? 'ew-resize' : cands[0].axis === 'y' ? 'ns-resize' : 'grab';
+}
+
+// ── pointers: one = drag a handle or pan; two = pinch zoom (+ pan) ──
+const pointers = new Map();   // pointerId → [px, py]
+let pinch = null;             // { mx, my, dist, xSpan, ySpan }
+
+function startPinch(){
+  const [[ax, ay], [bx, by]] = [...pointers.values()];
+  const cx = (ax + bx) / 2, cy = (ay + by) / 2;
+  pinch = { mx: invX(cx), my: invY(cy),
+            dx: Math.max(Math.abs(bx - ax), 1), dy: Math.max(Math.abs(by - ay), 1),
+            dist: Math.max(Math.hypot(bx - ax, by - ay), 1),
+            xSpan: xMax - xMin, ySpan: yMax - yMin };
+}
+function doPinch(){
+  const [[ax, ay], [bx, by]] = [...pointers.values()];
+  const cx = (ax + bx) / 2, cy = (ay + by) / 2;
+  const s = pinch.dist / Math.max(Math.hypot(bx - ax, by - ay), 1);   // >1 when fingers close
+  const xs = zoomAxis === 'y' ? pinch.xSpan : clamp(pinch.xSpan * s, SPAN_MIN, SPAN_MAX);
+  const ys = zoomAxis === 'x' ? pinch.ySpan : clamp(pinch.ySpan * s, SPAN_MIN, SPAN_MAX);
+  // keep the math point first under the fingers' midpoint under the midpoint
+  xMin = pinch.mx - cx / W * xs;        xMax = xMin + xs;
+  yMin = pinch.my - (1 - cy / H) * ys;  yMax = yMin + ys;
+  draw(ctx);
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if(e.pointerType === 'mouse' && e.button !== 0) return;
+  touchInput = e.pointerType !== 'mouse';
+  try { canvas.setPointerCapture(e.pointerId); } catch(err){ /* capture is optional */ }
+  const [px, py] = getPos(e);
+  pointers.set(e.pointerId, [px, py]);
+  if(pointers.size === 2){                 // second finger: switch to pinch
+    drag = null; pending = null; panning = null;
+    activeIds = new Set();
+    startPinch();
+    return;
+  }
+  if(pointers.size > 2) return;
+  const c = candidates(px, py);
+  if(c.length === 1)      startDrag(c[0], px, py);
+  else if(c.length > 1){  pending = { cands: c, px, py }; activeIds = new Set(c.map(h => h.id)); draw(ctx); }
+  else { panning = { mx: invX(px), my: invY(py) }; canvas.style.cursor = 'move'; }
+});
+
+canvas.addEventListener('pointermove', e => {
+  const [px, py] = getPos(e);
+  if(pointers.has(e.pointerId)) pointers.set(e.pointerId, [px, py]);
+  if(pinch){ if(pointers.size >= 2) doPinch(); return; }
+  if(e.pointerType === 'mouse') touchInput = false;
+  if(pending){
+    const dx = px - pending.px, dy = py - pending.py;
+    if(Math.hypot(dx, dy) < DIR_THRESH) return;
+    const h = chooseByDirection(pending.cands, dx, dy);
+    startDrag(h, pending.px, pending.py);
+    pending = null;
+  }
+  if(drag){ doDrag(px, py); return; }
+  if(panning){
+    const dx = panning.mx - invX(px), dy = panning.my - invY(py);
+    xMin += dx; xMax += dx; yMin += dy; yMax += dy;
+    clampView();
+    draw(ctx);
+    return;
+  }
+  hover(px, py);
+});
+
+function hover(px, py){
+  const c = candidates(px, py);
+  canvas.style.cursor = cursorFor(c);
+  const ids = new Set(c.map(h => h.id));
+  if([...ids].join() !== [...activeIds].join()){ activeIds = ids; draw(ctx); }
+}
+
+function endInteraction(e){
+  pointers.delete(e.pointerId);
+  if(pinch){ if(pointers.size < 2) pinch = null; return; }   // lift all fingers before panning again
+  if(pointers.size) return;
+  drag = null; pending = null; panning = null;
+  if(e.pointerType === 'mouse'){ const [px, py] = getPos(e); hover(px, py); }   // keep the hover cursor
+  else { canvas.style.cursor = 'default'; activeIds = new Set(); draw(ctx); }
+}
+canvas.addEventListener('pointerup', endInteraction);
+canvas.addEventListener('pointercancel', endInteraction);
+canvas.addEventListener('pointerleave', () => {
+  if(!drag && !pending && !panning && !pinch && activeIds.size){ activeIds = new Set(); draw(ctx); }
+});
+
+// keep the view inside the zoom limits and away from huge coordinates
+function clampView(){
+  const fix = (lo, hi) => {
+    let span = clamp(hi - lo, SPAN_MIN, SPAN_MAX), mid = clamp((lo + hi) / 2, -COORD_MAX, COORD_MAX);
+    return [mid - span / 2, mid + span / 2];
+  };
+  if(!(xMax - xMin >= SPAN_MIN && xMax - xMin <= SPAN_MAX && Math.abs(xMin) < COORD_MAX && Math.abs(xMax) < COORD_MAX))
+    [xMin, xMax] = fix(xMin, xMax);
+  if(!(yMax - yMin >= SPAN_MIN && yMax - yMin <= SPAN_MAX && Math.abs(yMin) < COORD_MAX && Math.abs(yMax) < COORD_MAX))
+    [yMin, yMax] = fix(yMin, yMax);
+}
+
+// ── zoom axis selector ──
+let zoomAxis = 'both';
+const zoomBtns = { both: document.getElementById('zoom-xy'),
+                   x: document.getElementById('zoom-x'),
+                   y: document.getElementById('zoom-y') };
+Object.entries(zoomBtns).forEach(([mode, btn]) => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    zoomAxis = mode;
+    Object.values(zoomBtns).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+// ── scroll zoom about the mouse ──
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  // proportional to the scroll amount, so trackpads zoom smoothly
+  const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+  const factor = clamp(Math.exp(dy * 0.0015), 0.5, 2);
+  const [px, py] = getPos(e);
+  const mx = invX(px), my = invY(py);
+  if(zoomAxis !== 'y'){
+    const f = clamp((xMax - xMin) * factor, SPAN_MIN, SPAN_MAX) / (xMax - xMin);
+    xMin = mx + (xMin - mx) * f; xMax = mx + (xMax - mx) * f;
+  }
+  if(zoomAxis !== 'x'){
+    const f = clamp((yMax - yMin) * factor, SPAN_MIN, SPAN_MAX) / (yMax - yMin);
+    yMin = my + (yMin - my) * f; yMax = my + (yMax - my) * f;
+  }
+  draw(ctx);
+}, { passive: false });
+
+canvas.addEventListener('dblclick', () => { resetView(); draw(ctx); });
+
+// ─────────────────────────────────────────────────────────────────
+//  URL STATE
+// ─────────────────────────────────────────────────────────────────
+function encodeState(){
+  const p = new URLSearchParams();
+  for(const k of TOOL.keys) p.set(k, fmt(S[k]));
+  if(intMode) p.set('int', '1');
+  if(TOOL.modes) p.set('type', TOOL.mode);
+  p.set('v', [xMin, xMax, yMin, yMax].map(v => fmt(Math.round(v * 100) / 100)).join(','));
+  return p;
+}
+function loadFromURL(){
+  const p = new URLSearchParams(window.location.search);
+  try {
+    // combined explorers: pick the function type first (with its defaults and view)
+    if(TOOL.modes && TOOL.modes.some(([id]) => id === p.get('type'))){
+      TOOL.setModeRaw(p.get('type'));
+      for(const key of Object.keys(S)) delete S[key];
+      Object.assign(S, TOOL.defaults);
+      resetView();
+    }
+    // each value is checked on its own: a bad one is ignored, the rest still load
+    for(const k of TOOL.keys){
+      const raw = p.get(k);
+      if(raw === null || raw.trim() === '') continue;
+      const v = Number(raw);
+      if(!isFinite(v) || Math.abs(v) > 1e6) continue;
+      const trial = { ...S, [k]: parseFloat(v.toFixed(6)) };
+      if(!TOOL.validate || TOOL.validate(trial)) Object.assign(S, trial);
+    }
+    if(TOOL.roundToInt && p.get('int') === '1'){ intMode = true; TOOL.roundToInt(S); }
+    if(p.has('v')){
+      const [x0, x1, y0, y1] = p.get('v').split(',').map(Number);
+      if([x0, x1, y0, y1].every(isFinite) && x1 > x0 && y1 > y0){
+        xMin = x0; xMax = x1; yMin = y0; yMax = y1;
+        clampView();
+      }
+    }
+  } catch(e){ /* malformed URL — keep defaults */ }
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  EXPORT PNG  (always light mode, white background, 2× resolution)
+// ─────────────────────────────────────────────────────────────────
+document.getElementById('btn-export').addEventListener('click', () => {
+  const out = document.createElement('canvas');
+  const k = 2;
+  out.width = W * k; out.height = H * k;
+  const oc = out.getContext('2d');
+  oc.scale(k, k);
+  const saved = activeIds; activeIds = new Set();
+  forceLight = true;
+  draw(oc);
+  forceLight = false;
+  activeIds = saved;
+  const link = document.createElement('a');
+  link.download = TOOL.file + '.png';
+  link.href = out.toDataURL('image/png');
+  link.click();
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  COPY LINK
+// ─────────────────────────────────────────────────────────────────
+document.getElementById('btn-share').addEventListener('click', () => {
+  const url = `${location.href.split(/[?#]/)[0]}?${encodeState()}`;
+  const btn = document.getElementById('btn-share');
+  const done = () => {
+    btn.textContent = '✓ Copied!'; btn.classList.add('copied');
+    setTimeout(() => { btn.innerHTML = '&#x1F517; Copy link'; btn.classList.remove('copied'); }, 2000);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(done, () => fallbackCopy(url, done));
+  } else fallbackCopy(url, done);
+});
+function fallbackCopy(text, done){
+  const ta = document.createElement('textarea');
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch(e){}
+  ta.remove();
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  INTEGER LOCK
+// ─────────────────────────────────────────────────────────────────
+const intLock = document.getElementById('int-lock');
+function applyIntLock(){
+  intLock.classList.toggle('on', intMode);
+  intLock.setAttribute('aria-checked', String(intMode));
+}
+function toggleIntLock(){
+  intMode = !intMode;
+  if(intMode){ TOOL.roundToInt(S); if(TOOL.onEdit) TOOL.onEdit(); }   // snap current values, then redraw
+  applyIntLock();
+  render();
+}
+if(TOOL.roundToInt){
+  intLock.style.display = 'flex';
+  intLock.addEventListener('click', toggleIntLock);
+  intLock.addEventListener('keydown', e => { if(e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); toggleIntLock(); } });
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  FUNCTION-TYPE BUTTONS  (combined explorers)
+// ─────────────────────────────────────────────────────────────────
+const modeRow = document.getElementById('mode-row');
+function applyModeButtons(){
+  modeRow.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mode === TOOL.mode));
+  document.title = TOOL.title;
+}
+if(TOOL.modes){
+  modeRow.style.display = 'flex';
+  for(const [id, name] of TOOL.modes){
+    const b = document.createElement('button');
+    b.textContent = name; b.dataset.mode = id;
+    b.addEventListener('click', () => {
+      if(id === TOOL.mode) return;
+      TOOL.switchMode(id, S, api);         // converts parameters, keeps the view
+      activeIds = new Set();
+      applyModeButtons();
+      render();
+    });
+    modeRow.appendChild(b);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────────────────────────
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+window.addEventListener('resize', () => { setCanvasSize(); render(); });
+loadFromURL();
+applyIntLock();
+if(TOOL.modes) applyModeButtons();
+setCanvasSize();
+render();
+</script>
+</body>
+</html>
