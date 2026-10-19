@@ -62,10 +62,24 @@ canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
   border: 0.5px solid #ddd;
   min-height: 6.5rem;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   overflow-x: auto;
 }
+#formula-math { max-width: 100%; }
+/* the "story" sentence under the formula (tools that provide one) */
+#story-line {
+  display: none;
+  margin-top: 0.15rem;
+  font-family: 'KaTeX_Main', 'Times New Roman', serif;
+  font-size: 1.2rem;
+  line-height: 1.45;
+  text-align: left;                 /* two lines; the second is indented */
+}
+#story-line i { font-family: 'KaTeX_Math', 'Times New Roman', serif; }
+#story-line .katex { font-size: 1em; }
+#story-line .indent { display: inline-block; width: 1.6em; }
 #formula-display .katex { font-size: 1.35em; }
 
 /* ── action buttons (export / share) ── */
@@ -164,7 +178,7 @@ canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
   </div>
 </div>
 
-<div id="formula-display"><span id="formula-math"></span></div>
+<div id="formula-display"><span id="formula-math"></span><div id="story-line"></div></div>
 
 <div id="action-row">
   <button id="btn-export">&#x2193; Export PNG</button>
@@ -280,17 +294,54 @@ function makeStory(kind){
     return { rel: exact ? '=' : '\\approx', tex: polyTex(terms) };
   }
 
-  // exponential base m written exactly in integer mode (m = blue height / h)
+  // exponential base m as an exact fraction in integer mode (m = blue height / h)
+  function intM(S){
+    if(S.h !== 0) return frac(BigInt(Math.round(S.h * S.m)), BigInt(S.h));
+    let d = 1;                                   // h = 0: m is remembered, find a small fraction
+    while(d < 1000 && Math.abs(S.m * d - Math.round(S.m * d)) > 1e-6) d++;
+    return frac(BigInt(Math.round(S.m * d)), BigInt(d));
+  }
   function intBaseTex(S){
-    let q;
-    if(S.h !== 0) q = frac(BigInt(Math.round(S.h * S.m)), BigInt(S.h));
-    else {                                       // h = 0: m is remembered, find a small fraction
-      let d = 1;
-      while(d < 1000 && Math.abs(S.m * d - Math.round(S.m * d)) > 1e-6) d++;
-      q = frac(BigInt(Math.round(S.m * d)), BigInt(d));
-    }
+    const q = intM(S);
     return q.den === 1n ? q.tex : `\\left(${q.tex}\\right)`;
   }
+
+  // the story in words, on two lines:
+  //   f starts at 2 and increases by 3
+  //       when x moves from 1 by 2
+  // For the exponential, the multiplier is also shown as (blue dot height)/(red dot height).
+  function storyHTML(S, colour, api){
+    const span = (name, html) => `<span style="color:${colour(name)}">${html}</span>`;
+    const num  = v => (v < 0 ? MINUS : '') + fmtU(Math.abs(v));
+    // inline fraction (blue dot height)/(red dot height), coloured like the dots
+    const ratio = (top, bot) => window.katex
+      ? katex.renderToString(`\\frac{\\textcolor{${colour('blue')}}{${fmtU(top)}}}{\\textcolor{${colour('red')}}{${fmtU(bot)}}}`,
+                             { throwOnError: false })
+      : `${fmtU(top)}/${fmtU(bot)}`;
+    let change;
+    if(kind !== 'exponential'){
+      change = S.m > 0 ? `increases by ${num(S.m)}`
+             : S.m < 0 ? `decreases by ${num(-S.m)}` : 'stays the same';
+    } else {
+      // always "multiplied by m", matching the base of the formula
+      let mul;
+      if(api.intMode){ const q = intM(S); mul = q.den === 1n ? `${q.num}` : `${q.num}/${q.den}`; }
+      else mul = fmtU(S.m);
+      change = `is multiplied by ${mul}`;
+      // where the multiplier comes from: |blue dot height| / |red dot height|  (no signs)
+      if(S.h !== 0){
+        const top = Math.abs(S.h * S.m), bot = Math.abs(S.h);
+        const raw = `${fmtU(top)}/${fmtU(bot)}`;
+        if(mul !== raw){                                 // skip "= 5/3" after "multiplied by 5/3"
+          const val = mul.includes('/') ? mul.split('/')[0] / mul.split('/')[1] : parseFloat(mul);
+          change += ` ${Math.abs(val - top / bot) < 1e-9 ? '=' : '≈'} ${ratio(top, bot)}`;
+        }
+      }
+    }
+    return `${span('red', `<i>f</i> starts at ${num(S.h)}`)} and ${span('blue', change)}`
+         + `<br><span class="indent"></span>when ${span('red', `<i>x</i> moves from ${num(S.k)}`)} by ${span('green', num(S.n))}`;
+  }
+
 
   // ── tooltip box drawn on the canvas ──
   function label(g, lines, ax, ay, side, color, C, api, gap = 12){
@@ -320,6 +371,47 @@ function makeStory(kind){
     return 'f: ÷' + String(r2(1 / S.m));            // decay: divide by 1/m
   }
 
+  // exponential blue tooltip:  "f: ×m = top/bot"  with a stacked fraction
+  //   top = |blue dot height| (blue), bot = |red dot height| (red); always a multiplication
+  function expBlueLabel(g, S, ax, ay, side, C, api){
+    let mul;
+    if(api.intMode){ const q = intM(S); mul = q.den === 1n ? `${q.num}` : `${q.num}/${q.den}`; }
+    else mul = String(r2(S.m));
+    const mulVal = mul.includes('/') ? mul.split('/')[0] / mul.split('/')[1] : parseFloat(mul);
+    const top = Math.abs(S.h * S.m), bot = Math.abs(S.h);
+    const tTop = fmtU(top), tBot = fmtU(bot);
+    // the "= top/bot" part is left out when h = 0 or when it would repeat the multiplier
+    const showFrac = S.h !== 0 && mul !== `${tTop}/${tBot}`;
+    const rel = Math.abs(mulVal - top / bot) < 1e-9 ? ' = ' : ' ≈ ';
+    const prefix = 'f: ×' + mul + (showFrac ? rel : '');
+
+    g.save();
+    const bigF = '600 14px system-ui, sans-serif', smallF = '600 12px system-ui, sans-serif';
+    g.font = bigF;   const wPre = g.measureText(prefix).width;
+    g.font = smallF; const wFr = showFrac ? Math.max(g.measureText(tTop).width, g.measureText(tBot).width) + 4 : 0;
+    const padX = 7, gap = 12;
+    const w = wPre + wFr + 2 * padX, h = showFrac ? 34 : 22;
+    let x = side === 'right' ? ax + gap : ax - gap - w, y = ay - h / 2;
+    x = api.clamp(x, 2, api.W - w - 2); y = api.clamp(y, 2, api.H - h - 2);
+    g.fillStyle = C.dark ? 'rgba(36,36,36,0.85)' : 'rgba(255,255,255,0.85)';
+    g.strokeStyle = C.blue[1]; g.lineWidth = 1.5;
+    g.beginPath(); g.roundRect(x, y, w, h, 6); g.fill(); g.stroke();
+    const tc = name => C.dark ? C[name][0] : C[name][1];
+    const mid = y + h / 2;
+    g.textBaseline = 'middle'; g.textAlign = 'left';
+    g.font = bigF; g.fillStyle = tc('blue');
+    g.fillText(prefix, x + padX, mid);
+    if(showFrac){
+      const fx = x + padX + wPre, cx = fx + wFr / 2;
+      g.font = smallF; g.textAlign = 'center';
+      g.fillStyle = tc('blue'); g.fillText(tTop, cx, mid - 8);
+      g.fillStyle = tc('red');  g.fillText(tBot, cx, mid + 9);
+      g.strokeStyle = tc('blue'); g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(fx, mid + 0.5); g.lineTo(fx + wFr, mid + 0.5); g.stroke();
+    }
+    g.restore();
+  }
+
   // ── exponential validity helpers ──
   // integer height for the blue dot: same side of the axis as h, never 0
   const intBlueY = (y, h) => { const Y = Math.round(y); return Math.sign(Y) === Math.sign(h) ? Y : Math.sign(h); };
@@ -337,6 +429,7 @@ function makeStory(kind){
     lastM: cfg.defaults.m,       // exponential: multiplier remembered while h = 0
 
     validate: S => S.n !== 0 && (kind !== 'exponential' || S.m > 0),
+    storyHTML,
 
     // dot positions ↔ parameters (used when switching function type)
     toDots: S => ({ rx: S.k, ry: S.h, gx: S.k + S.n, by: blueY(S) }),
@@ -425,7 +518,9 @@ function makeStory(kind){
         label(g, ['x: ' + signed(S.n)], X(S.k + S.n / 2), Y(S.h),
               up ? 'below' : 'above', C.green, C, api);
       }
-      if(showBlue){
+      if(showBlue && kind === 'exponential'){
+        expBlueLabel(g, S, X(x1), (Y(S.h) + Y(yb)) / 2, S.n > 0 ? 'right' : 'left', C, api);
+      } else if(showBlue){
         label(g, [blueText(S)], X(x1), (Y(S.h) + Y(yb)) / 2,
               S.n > 0 ? 'right' : 'left', C.blue, C, api);
       }
@@ -501,10 +596,10 @@ function resetView(){ ({ xMin, xMax, yMin, yMax } = TOOL.view); }
 resetView();
 
 // grab sizes in CSS px; fingers (and smartboard touches) get larger targets
-let touchInput = false;
-const HIT    = () => touchInput ? 24 : 14;   // dots
-const VLINE  = () => touchInput ? 14 : 8;    // vertical-line handles (half-width)
-const SEG    = () => touchInput ? 12 : 7;    // bars (half-width)
+// grab sizes in CSS px
+const HIT    = () => 14;   // dots
+const VLINE  = () => 8;    // vertical-line handles (half-width)
+const SEG    = () => 7;    // bars (half-width)
 
 // zoom limits: each axis span stays within [SPAN_MIN, SPAN_MAX]
 const SPAN_MIN = 1e-3, SPAN_MAX = 1e6, COORD_MAX = 1e7;
@@ -707,6 +802,12 @@ function updateFormula(){
   catch(e){ tex = '\\text{(formula unavailable for these values)}'; }
   if(window.katex) katex.render(tex, el, { displayMode: true, throwOnError: false });
   else el.textContent = tex;
+  // optional plain-language "story" line (HTML, so it can wrap on narrow screens)
+  const st = document.getElementById('story-line');
+  if(TOOL.storyHTML){
+    st.style.display = 'inline-block';
+    try { st.innerHTML = TOOL.storyHTML(S, texColor, api); } catch(e){ st.textContent = ''; }
+  }
 }
 
 function render(){ draw(ctx); updateFormula(); }
@@ -797,43 +898,24 @@ function cursorFor(cands){
   return cands[0].axis === 'x' ? 'ew-resize' : cands[0].axis === 'y' ? 'ns-resize' : 'grab';
 }
 
-// ── pointers: one = drag a handle or pan; two = pinch zoom (+ pan) ──
-const pointers = new Map();   // pointerId → [px, py]
-let pinch = null;             // { mx, my, dist, xSpan, ySpan }
+// ── pointer handling: ONE pointer at a time ──
+// Only the primary pointer (mouse, pen, or the first finger on a touch board) is followed.
+// Extra fingers — e.g. a hand pointing at the board mid-drag — are ignored completely.
+// If a new press arrives while an old one still looks active (its release was lost),
+// the old interaction is dropped, so the page can never get stuck in a drag or pan.
+let activePointer = null;      // pointerId being followed, or null
 
-function startPinch(){
-  const [[ax, ay], [bx, by]] = [...pointers.values()];
-  const cx = (ax + bx) / 2, cy = (ay + by) / 2;
-  pinch = { mx: invX(cx), my: invY(cy),
-            dx: Math.max(Math.abs(bx - ax), 1), dy: Math.max(Math.abs(by - ay), 1),
-            dist: Math.max(Math.hypot(bx - ax, by - ay), 1),
-            xSpan: xMax - xMin, ySpan: yMax - yMin };
-}
-function doPinch(){
-  const [[ax, ay], [bx, by]] = [...pointers.values()];
-  const cx = (ax + bx) / 2, cy = (ay + by) / 2;
-  const s = pinch.dist / Math.max(Math.hypot(bx - ax, by - ay), 1);   // >1 when fingers close
-  const xs = zoomAxis === 'y' ? pinch.xSpan : clamp(pinch.xSpan * s, SPAN_MIN, SPAN_MAX);
-  const ys = zoomAxis === 'x' ? pinch.ySpan : clamp(pinch.ySpan * s, SPAN_MIN, SPAN_MAX);
-  // keep the math point first under the fingers' midpoint under the midpoint
-  xMin = pinch.mx - cx / W * xs;        xMax = xMin + xs;
-  yMin = pinch.my - (1 - cy / H) * ys;  yMax = yMin + ys;
-  draw(ctx);
+function resetInteraction(){
+  drag = null; pending = null; panning = null; activePointer = null;
 }
 
 canvas.addEventListener('pointerdown', e => {
+  if(!e.isPrimary) return;                                     // ignore extra fingers
   if(e.pointerType === 'mouse' && e.button !== 0) return;
-  touchInput = e.pointerType !== 'mouse';
+  if(activePointer !== null) resetInteraction();               // a stale press: start fresh
+  activePointer = e.pointerId;
   try { canvas.setPointerCapture(e.pointerId); } catch(err){ /* capture is optional */ }
   const [px, py] = getPos(e);
-  pointers.set(e.pointerId, [px, py]);
-  if(pointers.size === 2){                 // second finger: switch to pinch
-    drag = null; pending = null; panning = null;
-    activeIds = new Set();
-    startPinch();
-    return;
-  }
-  if(pointers.size > 2) return;
   const c = candidates(px, py);
   if(c.length === 1)      startDrag(c[0], px, py);
   else if(c.length > 1){  pending = { cands: c, px, py }; activeIds = new Set(c.map(h => h.id)); draw(ctx); }
@@ -841,10 +923,8 @@ canvas.addEventListener('pointerdown', e => {
 });
 
 canvas.addEventListener('pointermove', e => {
+  if(activePointer !== null && e.pointerId !== activePointer) return;   // not the pointer we follow
   const [px, py] = getPos(e);
-  if(pointers.has(e.pointerId)) pointers.set(e.pointerId, [px, py]);
-  if(pinch){ if(pointers.size >= 2) doPinch(); return; }
-  if(e.pointerType === 'mouse') touchInput = false;
   if(pending){
     const dx = px - pending.px, dy = py - pending.py;
     if(Math.hypot(dx, dy) < DIR_THRESH) return;
@@ -860,7 +940,7 @@ canvas.addEventListener('pointermove', e => {
     draw(ctx);
     return;
   }
-  hover(px, py);
+  if(activePointer === null) hover(px, py);
 });
 
 function hover(px, py){
@@ -871,17 +951,18 @@ function hover(px, py){
 }
 
 function endInteraction(e){
-  pointers.delete(e.pointerId);
-  if(pinch){ if(pointers.size < 2) pinch = null; return; }   // lift all fingers before panning again
-  if(pointers.size) return;
-  drag = null; pending = null; panning = null;
-  if(e.pointerType === 'mouse'){ const [px, py] = getPos(e); hover(px, py); }   // keep the hover cursor
+  if(e.pointerId !== activePointer) return;                    // release of an ignored finger
+  resetInteraction();
+  if(e.pointerType === 'mouse' && e.type === 'pointerup'){ const [px, py] = getPos(e); hover(px, py); }
   else { canvas.style.cursor = 'default'; activeIds = new Set(); draw(ctx); }
 }
 canvas.addEventListener('pointerup', endInteraction);
 canvas.addEventListener('pointercancel', endInteraction);
+canvas.addEventListener('lostpointercapture', endInteraction);
+// leaving the page (switching windows, etc.) also ends any interaction
+window.addEventListener('blur', () => { if(activePointer !== null){ resetInteraction(); activeIds = new Set(); draw(ctx); } });
 canvas.addEventListener('pointerleave', () => {
-  if(!drag && !pending && !panning && !pinch && activeIds.size){ activeIds = new Set(); draw(ctx); }
+  if(activePointer === null && activeIds.size){ activeIds = new Set(); draw(ctx); }
 });
 
 // keep the view inside the zoom limits and away from huge coordinates

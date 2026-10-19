@@ -916,10 +916,10 @@ function resetView(){ ({ xMin, xMax, yMin, yMax } = TOOL.view); }
 resetView();
 
 // grab sizes in CSS px; fingers (and smartboard touches) get larger targets
-let touchInput = false;
-const HIT    = () => touchInput ? 24 : 14;   // dots
-const VLINE  = () => touchInput ? 14 : 8;    // vertical-line handles (half-width)
-const SEG    = () => touchInput ? 12 : 7;    // bars (half-width)
+// grab sizes in CSS px
+const HIT    = () => 14;   // dots
+const VLINE  = () => 8;    // vertical-line handles (half-width)
+const SEG    = () => 7;    // bars (half-width)
 
 // zoom limits: each axis span stays within [SPAN_MIN, SPAN_MAX]
 const SPAN_MIN = 1e-3, SPAN_MAX = 1e6, COORD_MAX = 1e7;
@@ -1212,43 +1212,24 @@ function cursorFor(cands){
   return cands[0].axis === 'x' ? 'ew-resize' : cands[0].axis === 'y' ? 'ns-resize' : 'grab';
 }
 
-// ── pointers: one = drag a handle or pan; two = pinch zoom (+ pan) ──
-const pointers = new Map();   // pointerId → [px, py]
-let pinch = null;             // { mx, my, dist, xSpan, ySpan }
+// ── pointer handling: ONE pointer at a time ──
+// Only the primary pointer (mouse, pen, or the first finger on a touch board) is followed.
+// Extra fingers — e.g. a hand pointing at the board mid-drag — are ignored completely.
+// If a new press arrives while an old one still looks active (its release was lost),
+// the old interaction is dropped, so the page can never get stuck in a drag or pan.
+let activePointer = null;      // pointerId being followed, or null
 
-function startPinch(){
-  const [[ax, ay], [bx, by]] = [...pointers.values()];
-  const cx = (ax + bx) / 2, cy = (ay + by) / 2;
-  pinch = { mx: invX(cx), my: invY(cy),
-            dx: Math.max(Math.abs(bx - ax), 1), dy: Math.max(Math.abs(by - ay), 1),
-            dist: Math.max(Math.hypot(bx - ax, by - ay), 1),
-            xSpan: xMax - xMin, ySpan: yMax - yMin };
-}
-function doPinch(){
-  const [[ax, ay], [bx, by]] = [...pointers.values()];
-  const cx = (ax + bx) / 2, cy = (ay + by) / 2;
-  const s = pinch.dist / Math.max(Math.hypot(bx - ax, by - ay), 1);   // >1 when fingers close
-  const xs = zoomAxis === 'y' ? pinch.xSpan : clamp(pinch.xSpan * s, SPAN_MIN, SPAN_MAX);
-  const ys = zoomAxis === 'x' ? pinch.ySpan : clamp(pinch.ySpan * s, SPAN_MIN, SPAN_MAX);
-  // keep the math point first under the fingers' midpoint under the midpoint
-  xMin = pinch.mx - cx / W * xs;        xMax = xMin + xs;
-  yMin = pinch.my - (1 - cy / H) * ys;  yMax = yMin + ys;
-  draw(ctx);
+function resetInteraction(){
+  drag = null; pending = null; panning = null; activePointer = null;
 }
 
 canvas.addEventListener('pointerdown', e => {
+  if(!e.isPrimary) return;                                     // ignore extra fingers
   if(e.pointerType === 'mouse' && e.button !== 0) return;
-  touchInput = e.pointerType !== 'mouse';
+  if(activePointer !== null) resetInteraction();               // a stale press: start fresh
+  activePointer = e.pointerId;
   try { canvas.setPointerCapture(e.pointerId); } catch(err){ /* capture is optional */ }
   const [px, py] = getPos(e);
-  pointers.set(e.pointerId, [px, py]);
-  if(pointers.size === 2){                 // second finger: switch to pinch
-    drag = null; pending = null; panning = null;
-    activeIds = new Set();
-    startPinch();
-    return;
-  }
-  if(pointers.size > 2) return;
   const c = candidates(px, py);
   if(c.length === 1)      startDrag(c[0], px, py);
   else if(c.length > 1){  pending = { cands: c, px, py }; activeIds = new Set(c.map(h => h.id)); draw(ctx); }
@@ -1256,10 +1237,8 @@ canvas.addEventListener('pointerdown', e => {
 });
 
 canvas.addEventListener('pointermove', e => {
+  if(activePointer !== null && e.pointerId !== activePointer) return;   // not the pointer we follow
   const [px, py] = getPos(e);
-  if(pointers.has(e.pointerId)) pointers.set(e.pointerId, [px, py]);
-  if(pinch){ if(pointers.size >= 2) doPinch(); return; }
-  if(e.pointerType === 'mouse') touchInput = false;
   if(pending){
     const dx = px - pending.px, dy = py - pending.py;
     if(Math.hypot(dx, dy) < DIR_THRESH) return;
@@ -1275,7 +1254,7 @@ canvas.addEventListener('pointermove', e => {
     draw(ctx);
     return;
   }
-  hover(px, py);
+  if(activePointer === null) hover(px, py);
 });
 
 function hover(px, py){
@@ -1286,17 +1265,18 @@ function hover(px, py){
 }
 
 function endInteraction(e){
-  pointers.delete(e.pointerId);
-  if(pinch){ if(pointers.size < 2) pinch = null; return; }   // lift all fingers before panning again
-  if(pointers.size) return;
-  drag = null; pending = null; panning = null;
-  if(e.pointerType === 'mouse'){ const [px, py] = getPos(e); hover(px, py); }   // keep the hover cursor
+  if(e.pointerId !== activePointer) return;                    // release of an ignored finger
+  resetInteraction();
+  if(e.pointerType === 'mouse' && e.type === 'pointerup'){ const [px, py] = getPos(e); hover(px, py); }
   else { canvas.style.cursor = 'default'; activeIds = new Set(); draw(ctx); }
 }
 canvas.addEventListener('pointerup', endInteraction);
 canvas.addEventListener('pointercancel', endInteraction);
+canvas.addEventListener('lostpointercapture', endInteraction);
+// leaving the page (switching windows, etc.) also ends any interaction
+window.addEventListener('blur', () => { if(activePointer !== null){ resetInteraction(); activeIds = new Set(); draw(ctx); } });
 canvas.addEventListener('pointerleave', () => {
-  if(!drag && !pending && !panning && !pinch && activeIds.size){ activeIds = new Set(); draw(ctx); }
+  if(activePointer === null && activeIds.size){ activeIds = new Set(); draw(ctx); }
 });
 
 // keep the view inside the zoom limits and away from huge coordinates
