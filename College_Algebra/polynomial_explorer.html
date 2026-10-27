@@ -3,16 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Polynomial Root Explorer</title>
+<title>Polynomial Explorer</title>
 
-<script>
-MathJax = {
-  tex: { inlineMath: [['\\(','\\)']] },
-  options: { skipHtmlTags: ['script','noscript','style','textarea'] },
-  startup: { typeset: false }
-};
-</script>
-<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -24,85 +18,205 @@ body {
   max-width: 640px;
   margin: 0 auto;
 }
-#degree-row { display: flex; align-items: center; gap: 16px; margin-bottom: 1rem; }
-#degree-row span { font-size: 13px; color: #666; }
-.deg-btn {
-  width: 32px; height: 32px; border-radius: 8px;
-  border: 0.5px solid #aaa;
-  background: transparent; cursor: pointer;
-  font-size: 14px; font-weight: 500; color: #111;
-  transition: background 0.15s;
-}
-.deg-btn.active {
-  background: #111; color: #fff; border-color: #111;
-}
+
 canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
+#canvas-wrap { position: relative; }
 
-/* ── scaling slider ── */
-#scale-row {
-  display: flex; align-items: center; gap: 12px;
-  margin-top: 0.85rem;
+/* ── zoom axis selector overlay ── */
+#zoom-select {
+  position: absolute;
+  top: 8px; left: 8px;
+  display: flex; flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
-#scale-row label { font-size: 13px; color: #666; white-space: nowrap; }
-#scale-val {
-  font-size: 13px; font-weight: 500; min-width: 3.5ch; text-align: right;
+#zoom-select .zoom-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+  color: rgba(0,0,0,0.5);
+  text-transform: uppercase;
+  margin-bottom: 1px;
+  user-select: none;
 }
-
-/* Custom slider: thin neutral track, no fill, colored thumb only */
-#scale-slider {
-  flex: 1;
-  -webkit-appearance: none;
-  appearance: none;
-  height: 2px;
-  background: #ccc;
-  border-radius: 1px;
-  outline: none;
+#zoom-select button {
+  width: 36px; height: 30px;
+  border-radius: 5px;
+  border: 1px solid rgba(0,0,0,0.25);
+  background: rgba(255,255,255,0.55);
+  color: rgba(0,0,0,0.7);
+  font-size: 15px;
   cursor: pointer;
+  transition: background 0.12s;
+  line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
 }
-#scale-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  background: #185FA5;
-  border: none;
-  cursor: pointer;
-}
-#scale-slider::-moz-range-thumb {
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  background: #185FA5;
-  border: none;
-  cursor: pointer;
-}
-/* No fill on the lower portion (Firefox) */
-#scale-slider::-moz-range-progress { background: transparent; }
+#zoom-select button:hover  { background: rgba(255,255,255,0.75); }
+#zoom-select button.active { background: rgba(0,0,0,0.65); border-color: rgba(0,0,0,0.7); color: #fff; }
 
-@media (prefers-color-scheme: dark) {
-  #scale-slider { background: #444; }
-  #scale-slider::-webkit-slider-thumb { background: #85B7EB; }
-  #scale-slider::-moz-range-thumb    { background: #85B7EB; }
-}
-
-/* ── equation display ── */
-#poly-display {
+/* ── formula panel ── */
+#formula-display {
   margin-top: 0.85rem;
   padding: 0.85rem 1.1rem;
   background: #f5f5f5;
   border-radius: 8px;
   border: 0.5px solid #ddd;
-  min-height: 4rem;
+  min-height: 6.5rem;
   display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  overflow-x: auto;
 }
-#poly-display mjx-container { font-size: 115% !important; }
+#formula-math { max-width: 100%; }
+#formula-display .katex { font-size: 1.35em; }
+
+/* ── action buttons (export / share) ── */
+#action-row { display: flex; gap: 8px; margin-top: 0.75rem; }
+#action-row button {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 13px;
+  font-size: 13px; font-weight: 500;
+  border-radius: 7px;
+  border: 0.5px solid #bbb;
+  background: transparent; color: #333;
+  cursor: pointer; transition: background 0.13s;
+}
+#action-row button:hover { background: #f0f0f0; }
+#action-row button.copied { background: #d4edda; border-color: #82c99a; color: #1a6b32; }
+
+#int-lock { margin-left: auto; }
+#hint { margin-top: 0.6rem; font-size: 11px; color: #999; }
+#touch-log { display: none; margin-top: 0.6rem; font: 11px/1.35 ui-monospace, monospace; white-space: pre; overflow-x: auto; color: #555; background: #f5f5f5; border-radius: 6px; padding: 6px 8px; }
+
+/* ── integer-lock switch (shown only for tools that support it) ── */
+.switch {
+  display: none; align-items: center; gap: 8px;
+  font-size: 13px; color: #555;
+  cursor: pointer; user-select: none;
+}
+.switch .track {
+  position: relative; width: 40px; height: 22px; border-radius: 11px;
+  background: #ccc; transition: background 0.2s; flex-shrink: 0;
+}
+.switch .thumb {
+  position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: left 0.2s;
+}
+.switch.on .track { background: #185FA5; }
+.switch.on .thumb { left: 20px; }
+.switch.on { color: #185FA5; font-weight: 600; }
+
+/* ── degree buttons ── */
+#degree-row { display: flex; align-items: center; gap: 12px; margin-bottom: 0.85rem; }
+#degree-row span { font-size: 13px; color: #666; }
+#deg-btns { display: flex; gap: 6px; }
+.deg-btn {
+  width: 34px; height: 34px; border-radius: 8px;
+  border: 0.5px solid #aaa; background: transparent; cursor: pointer;
+  font-size: 14px; font-weight: 500; color: #111; transition: background 0.15s;
+}
+.deg-btn:hover { background: #f0f0f0; }
+.deg-btn.active { background: #111; color: #fff; border-color: #111; }
+
+/* ── animation controls ── */
+#anim-row { display: flex; align-items: center; gap: 12px; margin-top: 0.75rem; min-height: 36px; }
+#anim-lock { display: flex; }
+#anim-controls { display: none; gap: 6px; }
+#anim-row.on #anim-controls { display: flex; }
+#anim-controls button {
+  width: 44px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 7px; border: 0.5px solid #bbb;
+  background: transparent; color: #0D2A3A; cursor: pointer; padding: 0;
+  transition: background 0.13s, color 0.13s;
+}
+#anim-controls button:hover { background: #f0f0f0; }
+#anim-controls button.playing { background: #0D2A3A; color: #fff; border-color: #0D2A3A; }
+
+/* ── rational tool: scale slider, legend, right-click menu ── */
+#scale-row { display: flex; align-items: center; gap: 12px; margin-top: 0.85rem; }
+#scale-row label { font-size: 13px; color: #174E73; font-weight: 600; white-space: nowrap; }
+#scale-val { font-size: 13px; font-weight: 600; color: #174E73; min-width: 3.5ch; text-align: right; }
+#scale-slider {
+  flex: 1;
+  -webkit-appearance: none; appearance: none;
+  height: 2px; background: #ccc; border-radius: 1px;
+  outline: none; cursor: pointer;
+}
+#scale-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #2A7AB0; border: 2px solid #174E73; cursor: pointer;
+}
+#scale-slider::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #2A7AB0; border: 2px solid #174E73; cursor: pointer;
+}
+#scale-slider::-moz-range-progress { background: transparent; }
+
+#legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 0.75rem; font-size: 12px; color: #666; }
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; border: 2px solid; }
+.legend-dot.red    { background: #E8403E; border-color: #A32D2D; }
+.legend-dot.purple { background: #9B59B6; border-color: #6C3483; }
+
+#ctx-menu {
+  position: fixed;
+  background: #fff;
+  border: 0.5px solid #ccc;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 4px 0;
+  z-index: 1000;
+  min-width: 170px;
+  display: none;
+}
+#ctx-menu button {
+  display: block; width: 100%;
+  padding: 7px 14px;
+  background: none; border: none;
+  text-align: left; cursor: pointer;
+  font-size: 13px; color: #111;
+}
+#ctx-menu button:hover { background: #f0f0f0; }
 
 @media (prefers-color-scheme: dark) {
   body { background: #1a1a1a; color: #eee; }
-  #degree-row span, #scale-row label { color: #999; }
+  #zoom-select .zoom-label { color: rgba(255,255,255,0.7); }
+  #zoom-select button {
+    border-color: rgba(255,255,255,0.35);
+    background: rgba(0,0,0,0.28);
+    color: rgba(255,255,255,0.85);
+  }
+  #zoom-select button:hover  { background: rgba(0,0,0,0.45); }
+  #zoom-select button.active { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.7); color: #fff; }
+  #formula-display { background: #242424; border-color: #333; color: #eee; }
+  #action-row button { border-color: #555; color: #ccc; }
+  #action-row button:hover { background: #2a2a2a; }
+  #action-row button.copied { background: #1a3d25; border-color: #3a8a52; color: #7dcf97; }
+  #hint { color: #777; }
+  #touch-log { color: #aaa; background: #242424; }
+  .switch { color: #aaa; }
+  .switch .track { background: #444; }
+  .switch.on { color: #85B7EB; }
+
+  #degree-row span { color: #999; }
   .deg-btn { border-color: #555; color: #eee; }
+  .deg-btn:hover { background: #2a2a2a; }
   .deg-btn.active { background: #eee; color: #111; border-color: #eee; }
-  #poly-display { background: #242424; border-color: #333; color: #eee; }
+  #anim-controls button { border-color: #555; color: #E4E8EC; }
+  #anim-controls button:hover { background: #2a2a2a; }
+  #anim-controls button.playing { background: #E4E8EC; color: #111; border-color: #E4E8EC; }
+  #scale-row label, #scale-val { color: #7FB8E0; }
+  #scale-slider { background: #444; }
+  #scale-slider::-webkit-slider-thumb { background: #7FB8E0; border-color: #3D8BC0; }
+  #scale-slider::-moz-range-thumb    { background: #7FB8E0; border-color: #3D8BC0; }
+  #legend { color: #999; }
+  .legend-dot.red    { background: #F09595; border-color: #E24B4A; }
+  .legend-dot.purple { background: #C9A0E8; border-color: #9B59B6; }
+  #ctx-menu { background: #2a2a2a; border-color: #444; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+  #ctx-menu button { color: #eee; }
+  #ctx-menu button:hover { background: #383838; }
 }
 </style>
 </head>
@@ -110,11 +224,42 @@ canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
 
 <div id="degree-row">
   <span>degree</span>
-  <div id="deg-btns" style="display:flex;gap:6px;"></div>
+  <div id="deg-btns"></div>
 </div>
 
 <div id="canvas-wrap">
   <canvas id="plot"></canvas>
+  <div id="zoom-select">
+    <div class="zoom-label">Zoom</div>
+    <button id="zoom-xy" class="active" title="Scroll to zoom both axes">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <line x1="1" y1="8" x2="15" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <polyline points="4,5 1,8 4,11" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+        <polyline points="12,5 15,8 12,11" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+        <line x1="8" y1="1" x2="8" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <polyline points="5,4 8,1 11,4" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+        <polyline points="5,12 8,15 11,12" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </button>
+    <button id="zoom-x" title="Scroll to zoom x-axis only">&#x2194;</button>
+    <button id="zoom-y" title="Scroll to zoom y-axis only">&#x2195;</button>
+  </div>
+</div>
+
+<div id="anim-row">
+  <div id="anim-lock" class="switch" role="switch" aria-checked="false" tabindex="0" title="Erase the graph and draw it from right to left">
+    <span>Animate</span>
+    <div class="track"><div class="thumb"></div></div>
+  </div>
+  <div id="anim-controls">
+    <button id="anim-restart" title="Erase and start again at the right edge (R)">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><polygon points="9.6,1.2 13.8,3.2 10.6,6.6" fill="currentColor"/></svg>
+    </button>
+    <button id="anim-play" title="Draw to the left edge (Space)"></button>
+    <button id="anim-step" title="Draw to the next root (N or ←)">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="2.2" height="12" rx="0.6" fill="currentColor"/><polygon points="5.5,8 14,2.5 14,13.5" fill="currentColor"/></svg>
+    </button>
+  </div>
 </div>
 
 <div id="scale-row">
@@ -123,20 +268,1284 @@ canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
   <span id="scale-val">1</span>
 </div>
 
-<div id="poly-display">
-  <div id="math-output"></div>
+<div id="legend">
+  <div class="legend-item"><span class="legend-dot red"></span><span>roots (x-intercepts)</span></div>
+</div>
+
+<div id="formula-display"><span id="formula-math"></span></div>
+
+<div id="action-row">
+  <button id="btn-export">&#x2193; Export PNG</button>
+  <button id="btn-share">&#x1F517; Copy link</button>
+  <div id="int-lock" class="switch" role="switch" aria-checked="false" tabindex="0" title="Lock all values to integers">
+    <span>Integers only</span>
+    <div class="track"><div class="thumb"></div></div>
+  </div>
+</div>
+
+<div id="hint">Drag the red roots &nbsp;·&nbsp; Drag empty space to pan &nbsp;·&nbsp; Scroll or pinch to zoom &nbsp;·&nbsp; Double-click to fit the view to the graph &nbsp;·&nbsp; Right-click the x-axis to add, remove, or duplicate roots &nbsp;·&nbsp; Animate (roots locked): Space = play / pause, N or ← = next root, R = restart</div>
+<div id="touch-log"></div>
+
+<div id="ctx-menu">
+  <button id="ctx-add-root">Add root here</button>
+  <button id="ctx-dup-root">Duplicate root</button>
+  <button id="ctx-rem-root">Remove root</button>
 </div>
 
 <script>
+'use strict';
+// ═════════════════════════════════════════════════════════════════
+//  TOOL DEFINITION  (the only part that differs between explorers)
+// ═════════════════════════════════════════════════════════════════
+// POLYNOMIAL EXPLORER — the rational explorer's tool with no denominator
+//   f(x) = a · (x − r₁)(x − r₂)…          (standard form below it, with a multiplied in)
+// Handles:  red    roots r     x only (on the x-axis)
+//           a      the scale slider under the graph;  degree buttons load default roots
+// (The denominator list S.den is kept, always empty, so the code matches rational_explorer.)
+// A denominator root is a HOLE when the numerator has that root at least as many times,
+// otherwise a vertical ASYMPTOTE.  Roots count as equal only when exactly equal; a dragged
+// dot is pulled onto a nearby dot (MAGNET px) so equal roots are easy to make at any zoom.
+// The horizontal (deg num < deg den: y = 0;  equal: y = a) or slant (one more: a line)
+// asymptote is drawn dashed in amber when the graph has a vertical asymptote.
+// ANIMATION MODE (see ANIM below): the curve is hidden and then drawn from the right edge of
+// the window leftwards at constant on-screen speed; roots / asymptotes near the pen are
+// highlighted on the graph and in the factored formula.
+
+const RATIONAL = (() => {
+  const same  = (u, v) => Math.abs(u - v) < 1e-9;
+  const count = (list, x) => list.filter(r => same(r, x)).length;
+  const MAGNET = 8;                                // CSS px
+
+  const f = (S, x) => {
+    let y = S.a;
+    for(const r of S.num) y *= (x - r);
+    for(const s of S.den) y /= (x - s);
+    return y;
+  };
+
+  // holes, asymptotes and the reduced function (all common factors cancelled)
+  function analyze(S){
+    const num = [...S.num], den = [...S.den];
+    const holes = [], asymps = [];
+    for(const x of [...new Set(S.den)]){
+      if(asymps.some(v => same(v, x)) || holes.some(h => same(h.x, x))) continue;
+      const cn = count(S.num, x), cd = count(S.den, x);
+      if(cn >= cd) holes.push({ x }); else asymps.push(x);
+      for(let c = Math.min(cn, cd); c > 0; c--){          // cancel min(cn, cd) copies
+        num.splice(num.findIndex(r => same(r, x)), 1);
+        den.splice(den.findIndex(r => same(r, x)), 1);
+      }
+    }
+    const reduced = x => f({ a: S.a, num, den }, x);
+    for(const h of holes) h.y = reduced(h.x);
+    return { holes, asymps, degDiff: S.num.length - S.den.length };
+  }
+
+  // ── text helpers ──
+  const MINUS = '−';
+  const fmtU  = v => String(parseFloat(v.toFixed(4)));
+  const plain = v => v < 0 ? MINUS + fmtU(-v) : fmtU(v);
+
+  // ── tooltip box drawn on the canvas ──
+  function label(g, lines, ax, ay, side, color, C, api, gap = 12){
+    g.save();
+    g.font = '600 14px system-ui, sans-serif';
+    const padX = 7, padY = 5, lh = 18;
+    const w = Math.max(...lines.map(t => g.measureText(t).width)) + 2 * padX;
+    const h = lines.length * lh + 2 * padY - 4;
+    let x = ax - w / 2;
+    let y = side === 'below' ? ay + gap : ay - gap - h;
+    x = api.clamp(x, 2, api.W - w - 2);
+    y = api.clamp(y, 2, api.H - h - 2);
+    g.fillStyle = C.dark ? 'rgba(36,36,36,0.85)' : 'rgba(255,255,255,0.85)';
+    g.strokeStyle = color[1]; g.lineWidth = 1.5;
+    g.beginPath(); g.roundRect(x, y, w, h, 6); g.fill(); g.stroke();
+    g.fillStyle = C.dark ? color[0] : color[1];
+    g.textBaseline = 'top'; g.textAlign = 'left';
+    lines.forEach((t, i) => g.fillText(t, x + padX, y + padY + i * lh));
+    g.restore();
+  }
+
+  // ── exact expansion of ∏(x − r) (roots are terminating decimals) ──
+  const decimals = v => { const s = String(parseFloat(v.toFixed(6))); const i = s.indexOf('.'); return i < 0 ? 0 : s.length - i - 1; };
+  // v / 10^e as a decimal: exact when it has ≤ 4 decimals, otherwise rounded to 4
+  function decimalOf(v, e){
+    const neg = v < 0n;
+    let m = neg ? -v : v, exact = true;
+    if(e > 4){
+      const div = 10n ** BigInt(e - 4), r = m % div;
+      if(r !== 0n) exact = false;
+      m = m / div + (2n * r >= div ? 1n : 0n);
+      e = 4;
+    }
+    const P = 10n ** BigInt(e);
+    const fp = (m % P).toString().padStart(e, '0').replace(/0+$/, '');
+    const tex = fp ? `${m / P}.${fp}` : `${m / P}`;
+    return { tex, zero: m === 0n, neg: neg && m !== 0n, one: tex === '1', exact };
+  }
+  function expand(roots, a = 1){                     // coefficients of a·∏(x − r), highest power first
+    const d = Math.max(0, ...roots.map(decimals));
+    const da = decimals(a), A = BigInt(Math.round(a * Math.pow(10, da)));
+    const s = 10n ** BigInt(d);
+    let c = [1n];                                    // ∏(s·x − R) with R = r·10^d
+    for(const r of roots){
+      const R = BigInt(Math.round(r * Math.pow(10, d)));
+      const n = new Array(c.length + 1).fill(0n);
+      c.forEach((ci, i) => { n[i] += ci * s; n[i + 1] -= ci * R; });
+      c = n;
+    }
+    return c.map(ci => decimalOf(ci * A, d * roots.length + da));   // divide by s^n · 10^da
+  }
+  // polynomial from coefficients (zero terms dropped, ±1 hidden)
+  function polyTex(cs){
+    const deg = cs.length - 1;
+    let out = '';
+    cs.forEach((c, i) => {
+      if(c.zero) return;
+      const p = deg - i;
+      const v = p === 0 ? c.tex : (c.one ? '' : c.tex) + (p === 1 ? 'x' : `x^{${p}}`);
+      out += out ? ` ${c.neg ? '-' : '+'} ${v}` : (c.neg ? '-' : '') + v;
+    });
+    return out || '0';
+  }
+
+  // factored form with multiplicities as powers, sorted, each factor coloured
+  function factoredTex(roots, name, col, fmt, hot = []){
+    if(!roots.length) return '1';
+    const groups = [];
+    for(const r of [...roots].sort((u, v) => u - v)){
+      const last = groups[groups.length - 1];
+      if(last && same(last.r, r)) last.n++; else groups.push({ r, n: 1 });
+    }
+    return groups.map(({ r, n }) => {
+      const pow = n > 1 ? `^{${n}}` : '';
+      const t = r === 0 ? col(name, 'x' + pow)
+              : `\\left(${col(name, `x ${r < 0 ? '+' : '-'} ${fmt(Math.abs(r))}`)}\\right)${pow}`;
+      return hot.some(v => same(v, r)) ? `\\colorbox{${highlight()}}{$${t}$}` : t;
+    }).join('');
+  }
+
+  // animation: distinct roots / asymptotes, right to left
+  function features(S){
+    const out = [];
+    for(const v of [...S.num, ...S.den].sort((u, w) => w - u)) if(!out.some(u => same(u, v))) out.push(v);
+    return out;
+  }
+  // features "in play":  the one the pen is at; otherwise the next one ahead (within
+  // NEAR_BEFORE px) and any just passed (within NEAR_AFTER px)
+  function hotX(S, api){
+    if(!ANIM.on) return [];
+    const px = api.X(ANIM.x);
+    const fs = features(S).map(v => ({ v, d: px - api.X(v) }));     // d > 0: still ahead of the pen
+    const at = fs.filter(o => Math.abs(o.d) < 1.5);
+    if(at.length) return at.map(o => o.v);
+    const ahead = fs.filter(o => o.d > 0 && o.d <= ANIM_NEAR_BEFORE)[0];   // nearest ahead (list is right → left)
+    return [...(ahead ? [ahead.v] : []), ...fs.filter(o => o.d < 0 && o.d >= -ANIM_NEAR_AFTER).map(o => o.v)];
+  }
+  const highlight = () => isDark() ? '#5C4D12' : '#FFE28A';
+
+  const amber  = C => C.dark ? 'rgba(255,220,60,0.85)'  : 'rgba(180,140,0,0.80)';
+  const violet = C => C.dark ? 'rgba(180,130,220,0.55)' : 'rgba(130,60,180,0.45)';
+  const paper  = C => C.dark ? '#232323' : '#fafafa';      // canvas background, for open circles
+
+  const tool = {
+    title: 'Polynomial Explorer',
+    file: 'polynomial',
+    defaults: { num: [-1, 1], den: [], a: 1 },
+    view: { xMin: -5, xMax: 5, yMin: -10, yMax: 10 },
+    f,
+
+    // x-values the curve must not be drawn across (true vertical asymptotes)
+    breaks: S => analyze(S).asymps,
+    // animation mode: only the part already drawn (from the pen to the right edge)
+    curveRange: () => ANIM.on ? [ANIM.x, Infinity] : null,
+    analyze, features, hotX,
+
+    // ── a window fitted to the graph (double-click, and first load without a saved view) ──
+    // x: every root and asymptote (and the y-axis when it is nearby), padded on both sides.
+    // y: the "interesting" heights: 0, local maxima / minima, holes, the y-intercept, the
+    //    lowest point (nearest the x-axis) of every branch between vertical asymptotes, the
+    //    horizontal asymptote, and (when the graph levels off toward a horizontal or slant
+    //    asymptote) the heights at the window's edges, all with margin.  The height is kept
+    //    comparable to the width (unless the graph is very flat), so branches near vertical
+    //    asymptotes look like curves heading off rather than vertical walls.
+    autoView(S){
+      const A = analyze(S), fx = features(S);
+      let lo = fx.length ? Math.min(...fx) : 0, hi = fx.length ? Math.max(...fx) : 0;
+      const reach = Math.max(hi - lo, 2);
+      if(lo - reach <= 0 && 0 <= hi + reach){ lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+      const padX = Math.max(1.5, 0.5 * (hi - lo));
+      let x0 = lo - padX, x1 = hi + padX;
+      const tx = niceTick(x1 - x0);
+      x0 = Math.floor(x0 / tx) * tx; x1 = Math.ceil(x1 / tx) * tx;
+      const xSpan = x1 - x0, delta = 0.06 * xSpan, poles = A.asymps;
+
+      const pts = [0];
+      const away = x => poles.every(p => Math.abs(x - p) >= delta * 0.999);
+      const add = x => { const y = f(S, x); if(isFinite(y)) pts.push(y); };
+      for(const h of A.holes) if(isFinite(h.y)) pts.push(h.y);
+      if(away(0)) add(0);
+      if(A.degDiff <= 0 || (A.degDiff === 1 && poles.length)){ if(away(x0)) add(x0); if(away(x1)) add(x1); }
+      if(poles.length && A.degDiff === 0) pts.push(S.a);
+      // local maxima / minima, sampled away from the poles
+      const N = 800;
+      let y1 = null, y2 = null;                       // previous two samples
+      for(let i = 0; i <= N; i++){
+        const x = x0 + i / N * xSpan, y = away(x) ? f(S, x) : NaN;
+        if(!isFinite(y)){ y1 = y2 = null; continue; }
+        if(y1 !== null && y2 !== null && (y1 - y2) * (y - y1) < 0) pts.push(y1);
+        y2 = y1; y1 = y;
+      }
+      // every branch (piece between vertical asymptotes) must reach into the window:
+      // include the height where each branch comes closest to the x-axis
+      const cuts = [x0, ...poles.filter(p => p > x0 && p < x1).sort((u, v) => u - v), x1];
+      for(let k = 0; k + 1 < cuts.length; k++){
+        let best = null;
+        for(let i = 1; i < 200; i++){
+          const y = f(S, cuts[k] + (cuts[k + 1] - cuts[k]) * i / 200);
+          if(isFinite(y) && (best === null || Math.abs(y) < Math.abs(best))) best = y;
+        }
+        if(best !== null) pts.push(best);
+      }
+
+      const lowY = Math.min(...pts), highY = Math.max(...pts), h = highY - lowY;
+      const span = h < 1e-9 ? 1.2 * xSpan : Math.max(1.4 * h, Math.min(1.2 * xSpan, 6 * h));
+      const mid = (lowY + highY) / 2, ty = niceTick(span);
+      const tidy = v => parseFloat(v.toPrecision(12));          // no floating-point dust
+      return { xMin: tidy(x0), xMax: tidy(x1),
+               yMin: tidy(Math.floor((mid - span / 2) / ty) * ty), yMax: tidy(Math.ceil((mid + span / 2) / ty) * ty) };
+    },
+
+    // "Integers only" switched on
+    roundToInt(S){
+      S.num = S.num.map(r => Math.round(r) || 0);
+      S.den = S.den.map(r => Math.round(r) || 0);
+      S.a = Math.round(S.a) || (Math.sign(S.a) || 1);
+    },
+
+    // ── URL:  n=-1.5,1.5 & d=-0.5,2.5 & a=1  (same as the original explorer) ──
+    encode(p, S, fmt){
+      p.set('n', S.num.map(fmt).join(','));
+      p.set('a', fmt(S.a));
+    },
+    decode(p, S){
+      const ok = v => isFinite(v) && Math.abs(v) <= 1e6;
+      const list = key => p.get(key).split(',').filter(t => t.trim() !== '').map(Number)
+                           .filter(ok).slice(0, 20).map(v => parseFloat(v.toFixed(6)));
+      if(p.has('n')) S.num = list('n');
+      if(p.has('d')) S.den = list('d');
+      if(p.has('a') && p.get('a').trim() !== '' && ok(Number(p.get('a'))))
+        S.a = parseFloat(Number(p.get('a')).toFixed(6));
+      S.den = [];                                     // polynomials only
+    },
+
+    // dashed vertical lines at denominator roots; horizontal / slant asymptote
+    under(g, S, api, C){
+      const { X, Y, W, H } = api;
+      const A = analyze(S);
+      g.save();
+      g.setLineDash([6, 4]); g.lineCap = 'butt';
+      g.strokeStyle = violet(C);
+      for(const x of [...new Set(S.den)]){
+        const hot = S.den.some((s, i) => same(s, x) && api.active.has('d' + i))
+                 || hotX(S, api).some(v => same(v, x));
+        g.lineWidth = hot ? 4.5 : 3;
+        g.beginPath(); g.moveTo(X(x), 0); g.lineTo(X(x), H); g.stroke();
+      }
+      if(A.asymps.length && A.degDiff <= 1 && S.a !== 0){
+        // quotient of the division:  0,  a,  or  a(x − Σr + Σs)
+        const q = A.degDiff < 0 ? () => 0
+                : A.degDiff === 0 ? () => S.a
+                : x => S.a * (x - S.num.reduce((t, r) => t + r, 0) + S.den.reduce((t, s) => t + s, 0));
+        const x0 = api.invX(0), x1 = api.invX(W);
+        const yc = y => Y(api.clamp(y, -1e7, 1e7));
+        g.setLineDash([8, 5]);
+        g.strokeStyle = amber(C); g.lineWidth = 2.5;
+        g.beginPath(); g.moveTo(0, yc(q(x0))); g.lineTo(W, yc(q(x1))); g.stroke();
+      }
+      g.restore();
+    },
+
+    // list order = drawing order (last is on top).  Where a red and a purple dot coincide,
+    // purple is on top at an asymptote and red is on top at a hole.
+    handles(S, api){
+      const { X, snap } = api;
+      const A = analyze(S);
+      const isHole = x => A.holes.some(h => same(h.x, x));
+      const move = (list, i) => tx => {
+        const lo = api.invX(0), hi = api.invX(api.W);           // stay in view
+        let x = api.clamp(tx, lo, hi);
+        x = api.intMode ? (Math.round(x) || 0) : snap(x, api.stepX());
+        // magnet: land exactly on a nearby dot (to make holes / repeated roots)
+        let best = MAGNET;
+        for(const r of [...S.num, ...S.den]){
+          if(r === list[i]) continue;
+          const d = Math.abs(X(r) - X(api.clamp(tx, lo, hi)));
+          if(d < best){ best = d; x = r; }
+        }
+        list[i] = x;
+      };
+      const yl = [api.invY(0), api.invY(api.H)];
+      const locked = ANIM.on;                                   // animation mode: dots stay put
+      const nums = S.num.map((x, i) => ({ id: 'n' + i, color: 'red', r: 8, axis: 'x', x, y: 0, locked, drag: move(S.num, i) }));
+      const dens = S.den.map((x, i) => ({ id: 'd' + i, color: 'purple', r: 8, axis: 'x', x, y: 0, locked,
+                                          seg: [x, yl[0], x, yl[1]], drag: move(S.den, i) }));
+      return [...dens.filter(h => isHole(h.x)), ...nums, ...dens.filter(h => !isHole(h.x))];
+    },
+
+    // top layer: open circles at holes, then tooltips for the active dots
+    labels(g, S, api, C, active){
+      const { X, Y } = api;
+      const A = analyze(S);
+      if(ANIM.on){
+        // soft halo around the dots in play, and the pen tip
+        g.save();
+        g.strokeStyle = highlight(); g.lineWidth = 4;
+        for(const v of hotX(S, api)){ g.beginPath(); g.arc(X(v), Y(0), 14, 0, 2 * Math.PI); g.stroke(); }
+        const yt = f(S, ANIM.x);
+        if(isFinite(yt) && ANIM.x < api.invX(api.W)){
+          g.beginPath(); g.arc(X(ANIM.x), Y(yt), 5.5, 0, 2 * Math.PI);
+          g.fillStyle = C.curve; g.fill();
+          g.strokeStyle = highlight(); g.lineWidth = 2.5; g.stroke();
+        }
+        g.restore();
+      }
+      for(const h of A.holes){
+        if(!isFinite(h.y)) continue;
+        if(ANIM.on && h.x < ANIM.x) continue;              // not drawn yet
+        g.save();
+        g.beginPath(); g.arc(X(h.x), Y(h.y), 6, 0, 2 * Math.PI);
+        g.fillStyle = paper(C); g.fill();
+        g.strokeStyle = C.curve; g.lineWidth = 2.5; g.stroke();
+        g.restore();
+      }
+      const times = (list, x) => { const c = count(list, x); return c > 1 ? `  (×${c})` : ''; };
+      const holeAt = x => A.holes.find(h => same(h.x, x));
+      // tooltips go above (roots) / below (asymptotes) the axis, unless that would cover a hole
+      S.num.forEach((x, i) => {
+        if(!active.has('n' + i)) return;
+        const h = holeAt(x), side = h && h.y > 0 ? 'below' : 'above';
+        label(g, ['root  x = ' + plain(x) + times(S.num, x)], X(x), Y(0), side, C.red, C, api, 14);
+      });
+      S.den.forEach((x, i) => {
+        if(!active.has('d' + i)) return;
+        const h = holeAt(x), side = h && h.y < 0 ? 'above' : 'below';
+        label(g, [(h ? 'hole' : 'asymptote') + '  x = ' + plain(x) + times(S.den, x)], X(x), Y(0), side, C.purple, C, api, 14);
+      });
+    },
+
+    tex(S, col, fmt, api){
+      const hot = hotX(S, api);
+      if(S.a === 0) return 'f(x) = 0';
+      const aT = S.a === 1 ? '' : S.a === -1 ? '-' : fmt(S.a);
+      const lead = aT === '' ? '' : col('blue', aT) + (aT === '-' ? '' : '\\,');
+      if(!S.num.length) return `f(x) = ${col('blue', fmt(S.a))}`;
+      const line1 = lead + factoredTex(S.num, 'red', col, fmt, hot);
+      // standard form (a multiplied in), unless it would look the same as the factored form
+      const same1 = S.num.length === 1 && (S.num[0] === 0 || S.a === 1);
+      if(same1) return `\\begin{aligned} f(x) &= ${line1} \\end{aligned}`;
+      const cs = expand(S.num, S.a);
+      const rel = cs.every(c => c.exact) ? '=' : '\\approx';
+      return `\\begin{aligned} f(x) &= ${line1} \\\\[6pt] &${rel} ${polyTex(cs)} \\end{aligned}`;
+    },
+
+    // page controls owned by this tool (the scale slider), refreshed on every render
+    sync(S, api){
+      const sl = document.getElementById('scale-slider');
+      sl.step = api.intMode ? '1' : '0.1';
+      sl.value = String(S.a);
+      document.getElementById('scale-val').textContent = plain(S.a);
+      document.querySelectorAll('.deg-btn').forEach(b => b.classList.toggle('active', Number(b.dataset.deg) === S.num.length));
+    },
+  };
+  return tool;
+})();
+
+const TOOL = RATIONAL;
+
+// ═════════════════════════════════════════════════════════════════
+//  SHARED GRAPHING CORE  (as in story_explorer_v6.html, plus four optional tool hooks:
+//    TOOL.breaks(S)         x-values the curve is never drawn across (poles)
+//    TOOL.curveRange(S)     [lo, hi]: draw only this part of the curve (animation)
+//    TOOL.autoView(S)       the window double-click resets to (fitted to the graph)
+//    TOOL.encode / decode   URL state for tools whose values aren't plain numbers
+//    TOOL.sync(S, api)      refresh tool-owned page controls after each render)
+// ═════════════════════════════════════════════════════════════════
+const S = structuredClone(TOOL.defaults);  // current parameters (deep copy: may hold arrays)
+let intMode = false;                       // "Integers only" switch (tools read this)
+let xMin, xMax, yMin, yMax;
+// TOOL.autoView(S), when present, computes a window that fits the current graph
+function resetView(){ ({ xMin, xMax, yMin, yMax } = TOOL.autoView ? TOOL.autoView(S) : TOOL.view); }
+resetView();
+
+// grab sizes in CSS px
+const HIT    = () => 14;   // dots
+const VLINE  = () => 8;    // vertical-line handles (half-width)
+const SEG    = () => 7;    // bars (half-width)
+
+// zoom limits: each axis span stays within [SPAN_MIN, SPAN_MAX]
+const SPAN_MIN = 1e-3, SPAN_MAX = 1e6, COORD_MAX = 1e7;
+const DIR_THRESH = 4;    // CSS px of motion before resolving overlapping handles
+
+// ── canvas (sharp on hi-DPI screens: drawing is done in CSS px) ──
 const canvas = document.getElementById('plot');
-const ctx = canvas.getContext('2d');
+const ctx    = canvas.getContext('2d');
+let W = 0, H = 0;
+function setCanvasSize(){
+  W = document.getElementById('canvas-wrap').clientWidth;
+  H = Math.round(W * 3/4);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
 
-// View bounds — mutable so pan/zoom can update them
-let xMin=-5, xMax=5, yMin=-10, yMax=10;
-// Reset values
-const XMIN0=-5, XMAX0=5, YMIN0=-10, YMAX0=10;
+const X    = x  => (x - xMin) / (xMax - xMin) * W;
+const Y    = y  => (1 - (y - yMin) / (yMax - yMin)) * H;
+const invX = px => xMin + px / W * (xMax - xMin);
+const invY = py => yMin + (1 - py / H) * (yMax - yMin);
 
-// Default roots per degree — symmetric, centered, scaled to stay visible at ±10
+// ── numbers & snapping ──
+const decStep = v => Math.pow(10, Math.floor(Math.log10(v)));
+const clamp   = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+function snap(v, s){
+  const d = Math.max(0, Math.ceil(-Math.log10(s) - 1e-9));
+  const r = parseFloat((Math.round(v / s) * s).toFixed(d));
+  return r === 0 ? 0 : r;                      // no negative zero
+}
+// snapping step tracks the zoom level: 0.1 at the default view
+const stepX = () => decStep((xMax - xMin) / 50);
+const stepY = () => decStep((yMax - yMin) / 50);
+function fmt(v){
+  if(Math.abs(v) < 1e-12) return '0';
+  // 4 decimal places normally; more only for tiny values (deep zoom)
+  return String(parseFloat(v.toFixed(Math.abs(v) < 0.01 ? 6 : 4)));
+}
+
+// ── colors ──
+let forceLight = false;   // set during PNG export
+function isDark(){ return !forceLight && window.matchMedia('(prefers-color-scheme: dark)').matches; }
+function getColors(){
+  const d = isDark();
+  return {
+    dark:   d,
+    axis:   d ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.15)',
+    grid:   d ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+    text:   d ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)',
+    bg:     d ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+    curve:  d ? '#E4E8EC' : '#0D2A3A',
+    // parameter colors: [fill, stroke]; formula uses stroke (light) / fill (dark)
+    red:    d ? ['#F09595', '#E24B4A'] : ['#E8403E', '#A32D2D'],
+    blue:   d ? ['#7FB8E0', '#3D8BC0'] : ['#2A7AB0', '#174E73'],
+    green:  d ? ['#8FD48F', '#4FA84F'] : ['#45A845', '#24672A'],
+    purple: d ? ['#C9A0E8', '#9B59B6'] : ['#9B59B6', '#6C3483'],
+  };
+}
+function texColor(name){ const c = getColors()[name]; return isDark() ? c[0] : c[1]; }
+
+// everything a tool needs from the page, passed explicitly
+const api = { X, Y, invX, invY, snap, decStep, clamp, stepX, stepY,
+              get W(){ return W; }, get H(){ return H; },
+              get intMode(){ return intMode; },          // "Integers only" switch
+              get active(){ return activeIds; } };       // hovered / dragged handle ids
+
+// ─────────────────────────────────────────────────────────────────
+//  DRAW
+// ─────────────────────────────────────────────────────────────────
+function niceTick(span){
+  const rough = span / 7;
+  const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+  for(const m of [1, 2, 5, 10]) if(mag * m >= rough) return mag * m;
+  return mag * 10;
+}
+function fmtTick(v){
+  if(Math.abs(v) < 1e-9) return '';
+  const r = Math.round(v * 1e6) / 1e6;
+  return Number.isInteger(r) ? String(r) : String(parseFloat(r.toPrecision(4)));
+}
+
+function draw(g){
+  const C = getColors();
+  g.clearRect(0, 0, W, H);
+  if(forceLight){ g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H); }
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+
+  // grid
+  // tick positions by integer index (never an endless loop, at most ~200 lines)
+  const ticks = (lo, hi, t) => {
+    const out = [], i0 = Math.ceil(lo / t - 1e-6), i1 = Math.floor(hi / t + 1e-6);
+    for(let i = i0; i <= i1 && out.length < 200; i++) out.push(i * t);
+    return out;
+  };
+  const xTick = niceTick(xMax - xMin), yTick = niceTick(yMax - yMin);
+  const xs = ticks(xMin, xMax, xTick), ys = ticks(yMin, yMax, yTick);
+  g.strokeStyle = C.grid; g.lineWidth = 1;
+  for(const x of xs){ const px = X(x); g.beginPath(); g.moveTo(px, 0); g.lineTo(px, H); g.stroke(); }
+  for(const y of ys){ const py = Y(y); g.beginPath(); g.moveTo(0, py); g.lineTo(W, py); g.stroke(); }
+
+  // axes
+  const ox = X(0), oy = Y(0);
+  g.strokeStyle = C.axis; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(0, oy); g.lineTo(W, oy); g.stroke();
+  g.beginPath(); g.moveTo(ox, 0); g.lineTo(ox, H); g.stroke();
+
+  // tick labels (kept on screen when an axis scrolls out of view)
+  g.fillStyle = C.text; g.font = '14px system-ui,sans-serif';
+  g.textAlign = 'center';
+  const lblY = clamp(oy + 16, 16, H - 4);
+  for(const x of xs){
+    if(Math.abs(x) < xTick * 0.01) continue;
+    g.fillText(fmtTick(x), X(x), lblY);
+  }
+  g.textAlign = 'right';
+  const lblX = clamp(ox - 6, 30, W - 4);
+  for(const y of ys){
+    if(Math.abs(y) < yTick * 0.01) continue;
+    g.fillText(fmtTick(y), lblX, Y(y) + 5);
+  }
+
+  g.save();
+  g.beginPath(); g.rect(0, 0, W, H); g.clip();
+
+  // layer 1: tool decorations under the curve
+  if(TOOL.under) TOOL.under(g, S, api, C);
+
+  // layer 2: the curve, one piece per interval between breaks (poles)
+  const span = yMax - yMin, lo = yMin - 10 * span, hi = yMax + 10 * span;
+  g.strokeStyle = C.curve; g.lineWidth = 3.5; g.lineJoin = 'round'; g.lineCap = 'round';
+  // optional TOOL.curveRange(): draw only part of the curve (animation)
+  const range = TOOL.curveRange ? TOOL.curveRange(S, api) : null;
+  const cL = range ? Math.max(xMin, range[0]) : xMin, cR = range ? Math.min(xMax, range[1]) : xMax;
+  const cuts = (TOOL.breaks ? TOOL.breaks(S) : []).filter(c => c > cL && c < cR).sort((u, v) => u - v);
+  const gapX = (xMax - xMin) * 1e-7;                 // stop this close to a pole
+  const ends = [cL, ...cuts.flatMap(c => [c - gapX, c + gapX]), cR];
+  for(let j = 0; j < ends.length; j += 2){
+    const xL = ends[j], xR = ends[j + 1];
+    if(!(xR > xL)) continue;
+    const steps = Math.max(4, Math.ceil((xR - xL) / (xMax - xMin) * W * 2));
+    let pen = false;
+    g.beginPath();
+    for(let i = 0; i <= steps; i++){
+      const x = i === steps ? xR : xL + (i / steps) * (xR - xL);
+      const y = TOOL.f(S, x);
+      if(!isFinite(y)){ pen = false; continue; }
+      const py = Y(clamp(y, lo, hi)), px = X(x);
+      if(!pen){ g.moveTo(px, py); pen = true; } else g.lineTo(px, py);
+    }
+    g.stroke();
+  }
+
+  // layer 3: tool decorations over the curve (segments etc.)
+  if(TOOL.over) TOOL.over(g, S, api, C);
+  g.restore();
+
+  // layer 4: handles, in list order (last = on top)
+  for(const h of TOOL.handles(S, api)){
+    if(h.kind === 'vline') continue;           // drawn by the tool itself
+    const [fill, stroke] = C[h.color];
+    const px = X(h.x), py = Y(h.y), r = h.r || 7;
+    g.save();
+    if(h.disabled) g.globalAlpha = 0.45;
+    g.beginPath(); g.arc(px, py, r, 0, 2 * Math.PI);
+    g.fillStyle = fill; g.fill();
+    g.strokeStyle = stroke; g.lineWidth = 2; g.stroke();
+    g.restore();
+  }
+
+  // layer 5: direction arrows for the hovered / dragged handle(s)
+  for(const h of TOOL.handles(S, api)){
+    if(!activeIds.has(h.id)) continue;
+    drawArrows(g, h, C);
+  }
+
+  // layer 6: tool tooltips / labels (top-most)
+  if(TOOL.labels) TOOL.labels(g, S, api, C, activeIds);
+
+  // pinch badge and touch-debug overlay (live canvas only, never in exported PNGs)
+  if(g === ctx) drawTouchOverlay(g);
+}
+
+function drawArrows(g, h, C){
+  const stroke = C[h.color][1];
+  const r = (h.r || 7) + 5, L = 11;
+  const px = X(h.x);
+  const py = h.kind === 'vline' ? H - 22 : Y(h.y);
+  const dirs = h.axis === 'x' ? [[1,0],[-1,0]] : h.axis === 'y' ? [[0,-1],[0,1]] : [[1,0],[-1,0],[0,-1],[0,1]];
+  g.save();
+  g.strokeStyle = stroke; g.fillStyle = stroke; g.lineWidth = 2;
+  for(const [dx, dy] of dirs){
+    const x0 = px + dx * r, y0 = py + dy * r, x1 = px + dx * (r + L), y1 = py + dy * (r + L);
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+    g.beginPath();
+    g.moveTo(x1 + dx * 4, y1 + dy * 4);
+    g.lineTo(x1 - dy * 4, y1 + dx * 4);
+    g.lineTo(x1 + dy * 4, y1 - dx * 4);
+    g.closePath(); g.fill();
+  }
+  g.restore();
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  FORMULA (KaTeX)
+// ─────────────────────────────────────────────────────────────────
+function col(name, s){ return `\\textcolor{${texColor(name)}}{${s}}`; }
+function updateFormula(){
+  const el = document.getElementById('formula-math');
+  let tex;
+  try { tex = TOOL.tex(S, col, fmt, api); }
+  catch(e){ tex = '\\text{(formula unavailable for these values)}'; }
+  if(window.katex) katex.render(tex, el, { displayMode: true, throwOnError: false });
+  else el.textContent = tex;
+}
+
+function render(){
+  draw(ctx);
+  updateFormula();
+  if(TOOL.sync) TOOL.sync(S, api);
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  HIT TESTING with layers
+//  All handles within the grab radius whose distance is close to the
+//  nearest one are candidates.  One candidate → grab it.  Several
+//  (overlapping handles) → wait for the first few px of motion and give
+//  it to the topmost handle whose drag direction matches the motion.
+// ─────────────────────────────────────────────────────────────────
+function candidates(px, py){
+  const hs = TOOL.handles(S, api);
+  const found = [];
+  for(let i = hs.length - 1; i >= 0; i--){        // topmost first
+    const h = hs[i];
+    if(h.disabled || h.locked) continue;
+    let d;
+    if(h.kind === 'vline'){
+      d = Math.abs(px - X(h.x)) + 3;               // lines yield to dots
+      if(d > VLINE() + 3) continue;
+    } else {
+      d = Math.hypot(px - X(h.x), py - Y(h.y));
+      if(d > HIT()) continue;
+    }
+    found.push({ h, d });
+  }
+  // bars: handles may carry a `seg` [x1,y1,x2,y2] that also grabs them,
+  // but only when no dot is under the pointer (dots always win)
+  if(!found.length){
+    for(let i = hs.length - 1; i >= 0; i--){
+      const h = hs[i];
+      const segs = h.segs || (h.seg ? [h.seg] : []);       // one bar or several
+      if(h.disabled || h.locked || !segs.length) continue;
+      const d = Math.min(...segs.map(sg => segDist(px, py, sg)));
+      if(d <= SEG()) found.push({ h, d });
+    }
+  }
+  if(!found.length) return [];
+  const dMin = Math.min(...found.map(f => f.d));
+  return found.filter(f => f.d <= dMin + 6).map(f => f.h);
+}
+
+function segDist(px, py, [x1, y1, x2, y2]){
+  const ax = X(x1), ay = Y(y1), bx = X(x2), by = Y(y2);
+  const vx = bx - ax, vy = by - ay, L2 = vx * vx + vy * vy;
+  const t = L2 ? clamp(((px - ax) * vx + (py - ay) * vy) / L2, 0, 1) : 0;
+  return Math.hypot(px - (ax + t * vx), py - (ay + t * vy));
+}
+
+function chooseByDirection(cands, dx, dy){
+  const dir = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+  return cands.find(h => h.axis === dir)
+      || cands.find(h => h.axis === 'xy')
+      || cands[0];
+}
+
+let drag = null;      // { id, offX, offY, start }
+let pending = null;   // { cands, px, py }
+let panning = null;   // { mx, my }
+let activeIds = new Set();
+
+function getPos(e){
+  const r = canvas.getBoundingClientRect();
+  return [e.clientX - r.left, e.clientY - r.top];
+}
+
+function startDrag(h, px, py){
+  drag = { id: h.id,
+           offX: X(h.x) - px,
+           offY: h.kind === 'vline' ? 0 : Y(h.y) - py,
+           start: structuredClone(S) };
+  activeIds = new Set([h.id]);
+  canvas.style.cursor = 'grabbing';
+}
+
+function doDrag(px, py){
+  const h = TOOL.handles(S, api).find(q => q.id === drag.id);
+  if(!h || h.disabled || h.locked) return;
+  h.drag(invX(px + drag.offX), invY(py + drag.offY), drag.start);
+  if(TOOL.onEdit) TOOL.onEdit();
+  render();
+}
+
+function cursorFor(cands){
+  if(!cands.length) return 'default';
+  if(cands.length > 1) return 'grab';
+  return cands[0].axis === 'x' ? 'ew-resize' : cands[0].axis === 'y' ? 'ns-resize' : 'grab';
+}
+
+// ── pointer handling: one-pointer interactions + guarded two-finger pinch zoom ──
+// (tested on the classroom smartboards; open any explorer with ?debug=1, or press D, to see every touch)
+// Rules (each one is there to stop stray / phantom touches from doing anything lasting):
+//  • The page keeps its OWN list of pointers that are down; it never waits on the browser's.
+//  • When nothing is in progress, ANY new press starts a fresh drag / pan, even if the board
+//    still thinks some phantom finger is down.
+//  • While something is in progress, extra presses are ignored. A dot drag is never interrupted.
+//  • Pinch zoom starts only from a clean two-finger press: the 1st finger on empty space (a pan
+//    that has not really moved yet), the 2nd finger within PINCH_WINDOW ms and PINCH_MIN_GAP px away.
+//  • A pinch ends for good as soon as EITHER finger lifts; the other finger then does nothing
+//    until it lifts too (no surprise pan).
+//  • If the pointers driving the current interaction go silent for TAKEOVER_MS (their release
+//    was lost), the next press takes over.  A pinch silent for PINCH_TIMEOUT ms ends by itself.
+//  • A pen beats fingers: pen down cancels a finger gesture; fingers are ignored while a pen is active.
+const PINCH_WINDOW  = 350;    // ms between 1st and 2nd finger
+const PINCH_MIN_GAP = 40;     // CSS px between the two fingers
+const LEAD_STILL    = 12;     // CSS px the 1st finger may have moved before the 2nd lands
+const PINCH_DEADBAND = 10;    // CSS px of spread / midpoint motion before the view starts to change
+const TAKEOVER_MS   = 1500;   // silence after which a new press takes over
+const PINCH_TIMEOUT = 3000;   // silence after which a pinch ends by itself
+const PEN_RECENT    = 1500;   // a pen counts as "on the board" while it has sent events this recently
+
+let pinchEnabled = true;      // (can be set false from the console for comparison)
+const pointers = new Map();   // pointerId → { type, x, y, x0, y0, t0, t, w, h }
+let lead = null;              // pointerId driving drag / pending / pan
+let pinch = null;             // { a, b, d0, m0, v0, live }
+
+const now = () => performance.now();
+const viewNow = () => ({ xMin, xMax, yMin, yMax });
+
+function resetInteraction(){
+  drag = null; pending = null; panning = null; pinch = null; lead = null;
+}
+const busyIds = () => pinch ? [pinch.a, pinch.b] : lead !== null ? [lead] : [];
+function silence(t){                                // ms since the busy pointers last did anything
+  const ts = busyIds().map(id => pointers.has(id) ? pointers.get(id).t : -Infinity);
+  return ts.length ? t - Math.max(...ts) : Infinity;
+}
+const penActive = t => [...pointers.values()].some(p => p.type === 'pen' && t - p.t < PEN_RECENT);
+function capture(id){ try { canvas.setPointerCapture(id); } catch(err){ /* optional */ } }
+
+// a single-pointer interaction (as in the other explorers)
+function beginSingle(e, px, py){
+  lead = e.pointerId;
+  capture(e.pointerId);
+  const c = candidates(px, py);
+  if(c.length === 1)      startDrag(c[0], px, py);
+  else if(c.length > 1){  pending = { cands: c, px, py }; activeIds = new Set(c.map(h => h.id)); draw(ctx); }
+  else { panning = { mx: invX(px), my: invY(py), v0: viewNow() }; canvas.style.cursor = 'move'; }
+}
+
+// second finger: turn a fresh, unmoved one-finger pan into a pinch
+function tryPinch(id, t){
+  if(!pinchEnabled || !panning || pinch) return 'ignored';
+  const A = pointers.get(lead), B = pointers.get(id);
+  if(!A || A.type !== 'touch' || B.type !== 'touch') return 'ignored (not two fingers)';
+  if(t - A.t0 > PINCH_WINDOW)                         return 'ignored (too late for pinch)';
+  if(Math.hypot(A.x - A.x0, A.y - A.y0) > LEAD_STILL) return 'ignored (1st finger already panning)';
+  if(Math.hypot(A.x - B.x, A.y - B.y) < PINCH_MIN_GAP) return 'ignored (fingers too close)';
+  ({ xMin, xMax, yMin, yMax } = panning.v0);           // undo the tiny pan so far
+  pinch = { a: lead, b: id, live: false };
+  rebasePinch();
+  panning = null; lead = null;
+  capture(id);
+  draw(ctx);
+  return 'PINCH started';
+}
+function pinchGeom(){
+  const A = pointers.get(pinch.a), B = pointers.get(pinch.b);
+  return { d: Math.max(10, Math.hypot(A.x - B.x, A.y - B.y)), m: [(A.x + B.x) / 2, (A.y + B.y) / 2] };
+}
+function rebasePinch(){ const { d, m } = pinchGeom(); pinch.d0 = d; pinch.m0 = m; pinch.v0 = viewNow(); }
+function pinchMove(){
+  const { d, m } = pinchGeom();
+  if(!pinch.live){
+    if(Math.abs(d - pinch.d0) < PINCH_DEADBAND && Math.hypot(m[0] - pinch.m0[0], m[1] - pinch.m0[1]) < PINCH_DEADBAND) return;
+    pinch.live = true; rebasePinch(); return;          // start from here: no jump
+  }
+  const s = clamp(pinch.d0 / d, 1e-3, 1e3);            // fingers apart → s < 1 → zoom in
+  const v = pinch.v0, spX = v.xMax - v.xMin, spY = v.yMax - v.yMin;
+  const nX = clamp(spX * (zoomAxis !== 'y' ? s : 1), SPAN_MIN, SPAN_MAX);
+  const nY = clamp(spY * (zoomAxis !== 'x' ? s : 1), SPAN_MIN, SPAN_MAX);
+  // the point that was under the starting midpoint stays under the current midpoint
+  const mx = v.xMin + pinch.m0[0] / W * spX, my = v.yMax - pinch.m0[1] / H * spY;
+  xMin = mx - m[0] / W * nX; xMax = xMin + nX;
+  yMax = my + m[1] / H * nY; yMin = yMax - nY;
+  clampView();
+  draw(ctx);
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if(e.pointerType === 'mouse' && e.button !== 0) return;
+  const [px, py] = getPos(e), t = now();
+  // the browser says no other pointer of this type is down: forget any we still remember
+  if(e.isPrimary && e.pointerType !== 'mouse')
+    for(const [id, p] of pointers) if(p.type === e.pointerType && id !== e.pointerId) pointers.delete(id);
+  pointers.set(e.pointerId, { type: e.pointerType, x: px, y: py, x0: px, y0: py, t0: t, t,
+                              w: Math.round(e.width || 0), h: Math.round(e.height || 0) });
+  let note;
+  if(busyIds().length){
+    const leadP = lead !== null ? pointers.get(lead) : null;
+    if(e.pointerType === 'pen' && !(leadP && leadP.type === 'pen')){ resetInteraction(); note = 'pen takes over'; }
+    else if(silence(t) > TAKEOVER_MS){ resetInteraction(); note = 'takeover (old pointers silent)'; }
+    else { tLog(e, tryPinch(e.pointerId, t)); return; }
+  }
+  if(e.pointerType === 'touch' && penActive(t)){ tLog(e, 'ignored (pen active)'); return; }
+  beginSingle(e, px, py);
+  tLog(e, (note ? note + ' → ' : '') + (drag ? 'drag ' + drag.id : pending ? 'pending' : 'pan'));
+});
+
+canvas.addEventListener('pointermove', e => {
+  const p = pointers.get(e.pointerId);
+  const [px, py] = getPos(e);
+  if(!p){                                             // a hovering mouse / pen
+    if(!busyIds().length && e.pointerType !== 'touch') hover(px, py);
+    return;
+  }
+  p.x = px; p.y = py; p.t = now();
+  if(pinch){
+    if(e.pointerId === pinch.a || e.pointerId === pinch.b) pinchMove();
+    else if(DEBUG) draw(ctx);
+    return;
+  }
+  if(e.pointerId !== lead){ if(DEBUG) draw(ctx); return; }   // extra finger: ignored
+  if(pending){
+    const dx = px - pending.px, dy = py - pending.py;
+    if(Math.hypot(dx, dy) < DIR_THRESH) return;
+    const h = chooseByDirection(pending.cands, dx, dy);
+    startDrag(h, pending.px, pending.py);
+    pending = null;
+  }
+  if(drag){ doDrag(px, py); return; }
+  if(panning){
+    const dx = panning.mx - invX(px), dy = panning.my - invY(py);
+    xMin += dx; xMax += dx; yMin += dy; yMax += dy;
+    clampView();
+    draw(ctx);
+  }
+});
+
+function hover(px, py){
+  const c = candidates(px, py);
+  canvas.style.cursor = cursorFor(c);
+  const ids = new Set(c.map(h => h.id));
+  if([...ids].join() !== [...activeIds].join()){ activeIds = ids; draw(ctx); }
+}
+
+function endPointer(e){
+  const known = pointers.delete(e.pointerId);
+  const involved = e.pointerId === lead || (pinch && (e.pointerId === pinch.a || e.pointerId === pinch.b));
+  if(known || involved) tLog(e, involved ? 'ends ' + (pinch ? 'pinch' : 'interaction') : '');
+  if(!involved){ if(DEBUG) draw(ctx); return; }
+  resetInteraction();
+  if(e.pointerType === 'mouse' && e.type === 'pointerup'){ const [px, py] = getPos(e); hover(px, py); }
+  else { canvas.style.cursor = 'default'; activeIds = new Set(); draw(ctx); }
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('lostpointercapture', endPointer);
+
+function resetAll(why){
+  if(!pointers.size && !busyIds().length) return;
+  pointers.clear(); resetInteraction(); activeIds = new Set();
+  tLog(null, 'reset: ' + why);
+  draw(ctx);
+}
+// leaving the page (switching windows, etc.) ends everything
+window.addEventListener('blur', () => resetAll('window lost focus'));
+document.addEventListener('visibilitychange', () => { if(document.hidden) resetAll('page hidden'); });
+canvas.addEventListener('pointerleave', () => {
+  if(!busyIds().length && activeIds.size){ activeIds = new Set(); draw(ctx); }
+});
+// watchdog: a pinch whose fingers have gone silent ends by itself
+setInterval(() => {
+  if(pinch && silence(now()) > PINCH_TIMEOUT){
+    tLog(null, 'pinch timed out');
+    pointers.delete(pinch.a); pointers.delete(pinch.b);
+    resetInteraction(); draw(ctx);
+  }
+}, 500);
+
+// ── touch debugging: open the page with ?debug=1 (or press D) ──
+let DEBUG = new URLSearchParams(location.search).get('debug') === '1';
+const tLines = [];
+function tLog(e, note){
+  if(!DEBUG) return;
+  const t = (now() / 1000).toFixed(2);
+  const who = e ? `${e.type.replace('pointer', '').padEnd(8)} ${e.pointerType.padEnd(5)} id=${e.pointerId}${e.isPrimary ? '*' : ' '} ` +
+                  `${Math.round(e.width || 0)}×${Math.round(e.height || 0)}` : '';
+  tLines.unshift(`${t}  ${who}  ${note || ''}`);
+  tLines.length = Math.min(tLines.length, 14);
+  const el = document.getElementById('touch-log');
+  el.style.display = 'block';
+  el.textContent = 'touch log  (* = browser says primary;  w×h = contact size)\n' + tLines.join('\n');
+}
+document.addEventListener('keydown', e => {
+  if((e.key === 'd' || e.key === 'D') && !e.ctrlKey && !e.metaKey && !e.altKey){
+    DEBUG = !DEBUG;
+    document.getElementById('touch-log').style.display = DEBUG ? 'block' : 'none';
+    draw(ctx);
+  }
+});
+// drawn on the live canvas only (never in exported PNGs)
+function drawTouchOverlay(g){
+  const C = getColors();
+  if(pinch){
+    g.save();
+    g.font = '600 13px system-ui, sans-serif';
+    const txt = 'pinch zoom', w = g.measureText(txt).width + 16;
+    g.fillStyle = C.dark ? 'rgba(127,184,224,0.9)' : 'rgba(23,78,115,0.85)';
+    g.beginPath(); g.roundRect(W - w - 8, 8, w, 24, 6); g.fill();
+    g.fillStyle = C.dark ? '#111' : '#fff'; g.textBaseline = 'middle';
+    g.fillText(txt, W - w, 20);
+    g.restore();
+  }
+  if(!DEBUG) return;
+  g.save();
+  for(const [id, p] of pointers){
+    const role = id === lead ? 'lead' : pinch && (id === pinch.a || id === pinch.b) ? 'pinch' : 'ignored';
+    g.strokeStyle = role === 'ignored' ? 'rgba(150,150,150,0.9)' : p.type === 'pen' ? '#2E9E4F' : '#E07B00';
+    g.setLineDash(role === 'ignored' ? [4, 4] : []);
+    g.lineWidth = 2.5;
+    g.beginPath(); g.arc(p.x, p.y, 22, 0, 2 * Math.PI); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = g.strokeStyle; g.font = '600 12px system-ui, sans-serif'; g.textAlign = 'left';
+    g.fillText(`${p.type} ${id} · ${role}`, p.x + 26, p.y - 4);
+  }
+  const state = pinch ? (pinch.live ? 'pinch (zooming)' : 'pinch (waiting)') : drag ? 'drag' : pending ? 'pending' : panning ? 'pan' : 'idle';
+  g.font = '600 12px ui-monospace, monospace'; g.textAlign = 'left';
+  g.fillStyle = C.dark ? '#eee' : '#111';
+  g.fillText(`state: ${state}   pointers down: ${pointers.size}`, 56, H - 10);
+  g.restore();
+}
+
+// keep the view inside the zoom limits and away from huge coordinates
+function clampView(){
+  const fix = (lo, hi) => {
+    let span = clamp(hi - lo, SPAN_MIN, SPAN_MAX), mid = clamp((lo + hi) / 2, -COORD_MAX, COORD_MAX);
+    return [mid - span / 2, mid + span / 2];
+  };
+  if(!(xMax - xMin >= SPAN_MIN && xMax - xMin <= SPAN_MAX && Math.abs(xMin) < COORD_MAX && Math.abs(xMax) < COORD_MAX))
+    [xMin, xMax] = fix(xMin, xMax);
+  if(!(yMax - yMin >= SPAN_MIN && yMax - yMin <= SPAN_MAX && Math.abs(yMin) < COORD_MAX && Math.abs(yMax) < COORD_MAX))
+    [yMin, yMax] = fix(yMin, yMax);
+}
+
+// ── zoom axis selector ──
+let zoomAxis = 'both';
+const zoomBtns = { both: document.getElementById('zoom-xy'),
+                   x: document.getElementById('zoom-x'),
+                   y: document.getElementById('zoom-y') };
+Object.entries(zoomBtns).forEach(([mode, btn]) => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    zoomAxis = mode;
+    Object.values(zoomBtns).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+// ── scroll zoom about the mouse ──
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  // proportional to the scroll amount, so trackpads zoom smoothly
+  const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+  const factor = clamp(Math.exp(dy * 0.0015), 0.5, 2);
+  const [px, py] = getPos(e);
+  const mx = invX(px), my = invY(py);
+  if(zoomAxis !== 'y'){
+    const f = clamp((xMax - xMin) * factor, SPAN_MIN, SPAN_MAX) / (xMax - xMin);
+    xMin = mx + (xMin - mx) * f; xMax = mx + (xMax - mx) * f;
+  }
+  if(zoomAxis !== 'x'){
+    const f = clamp((yMax - yMin) * factor, SPAN_MIN, SPAN_MAX) / (yMax - yMin);
+    yMin = my + (yMin - my) * f; yMax = my + (yMax - my) * f;
+  }
+  draw(ctx);
+}, { passive: false });
+
+canvas.addEventListener('dblclick', () => { resetView(); draw(ctx); });
+
+// ─────────────────────────────────────────────────────────────────
+//  URL STATE
+// ─────────────────────────────────────────────────────────────────
+function encodeState(){
+  const p = new URLSearchParams();
+  if(TOOL.encode) TOOL.encode(p, S, fmt);
+  else for(const k of TOOL.keys) p.set(k, fmt(S[k]));
+  if(intMode) p.set('int', '1');
+  p.set('v', [xMin, xMax, yMin, yMax].map(v => fmt(Math.round(v * 100) / 100)).join(','));
+  return p;
+}
+function loadFromURL(){
+  const p = new URLSearchParams(window.location.search);
+  try {
+    if(TOOL.decode) TOOL.decode(p, S);
+    else {
+      // each value is checked on its own: a bad one is ignored, the rest still load
+      for(const k of TOOL.keys){
+        const raw = p.get(k);
+        if(raw === null || raw.trim() === '') continue;
+        const v = Number(raw);
+        if(!isFinite(v) || Math.abs(v) > 1e6) continue;
+        const trial = { ...S, [k]: parseFloat(v.toFixed(6)) };
+        if(!TOOL.validate || TOOL.validate(trial)) Object.assign(S, trial);
+      }
+    }
+    if(TOOL.roundToInt && p.get('int') === '1'){ intMode = true; TOOL.roundToInt(S); }
+    if(p.has('v')){
+      const [x0, x1, y0, y1] = p.get('v').split(',').map(Number);
+      if([x0, x1, y0, y1].every(isFinite) && x1 > x0 && y1 > y0){
+        xMin = x0; xMax = x1; yMin = y0; yMax = y1;
+        clampView();
+      }
+    }
+  } catch(e){ /* malformed URL — keep defaults */ }
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  EXPORT PNG  (always light mode, white background, 2× resolution)
+// ─────────────────────────────────────────────────────────────────
+document.getElementById('btn-export').addEventListener('click', () => {
+  const out = document.createElement('canvas');
+  const k = 2;
+  out.width = W * k; out.height = H * k;
+  const oc = out.getContext('2d');
+  oc.scale(k, k);
+  const saved = activeIds; activeIds = new Set();
+  forceLight = true;
+  draw(oc);
+  forceLight = false;
+  activeIds = saved;
+  const link = document.createElement('a');
+  link.download = TOOL.file + '.png';
+  link.href = out.toDataURL('image/png');
+  link.click();
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  COPY LINK
+// ─────────────────────────────────────────────────────────────────
+document.getElementById('btn-share').addEventListener('click', () => {
+  const url = `${location.href.split(/[?#]/)[0]}?${encodeState()}`;
+  const btn = document.getElementById('btn-share');
+  const done = () => {
+    btn.textContent = '✓ Copied!'; btn.classList.add('copied');
+    setTimeout(() => { btn.innerHTML = '&#x1F517; Copy link'; btn.classList.remove('copied'); }, 2000);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(done, () => fallbackCopy(url, done));
+  } else fallbackCopy(url, done);
+});
+function fallbackCopy(text, done){
+  const ta = document.createElement('textarea');
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch(e){}
+  ta.remove();
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  INTEGER LOCK
+// ─────────────────────────────────────────────────────────────────
+const intLock = document.getElementById('int-lock');
+function applyIntLock(){
+  intLock.classList.toggle('on', intMode);
+  intLock.setAttribute('aria-checked', String(intMode));
+}
+function toggleIntLock(){
+  intMode = !intMode;
+  if(intMode){ TOOL.roundToInt(S); if(TOOL.onEdit) TOOL.onEdit(); }   // snap current values, then redraw
+  applyIntLock();
+  render();
+}
+if(TOOL.roundToInt){
+  intLock.style.display = 'flex';
+  intLock.addEventListener('click', toggleIntLock);
+  intLock.addEventListener('keydown', e => { if(e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); toggleIntLock(); } });
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  ANIMATION MODE — draw the graph from right to left
+//  The pen moves at a constant on-screen speed (arc length in CSS px per second).  Heights are
+//  clamped just outside the window, so the pen does not crawl up a branch heading to ±∞: once
+//  the curve leaves the window it moves straight on.  At a vertical asymptote the pen stops just
+//  to its right, then jumps to just left of it.
+//  ▸ play  (◀): draw to the left edge, pausing briefly at each root / asymptote
+//  ▸ step (|◀): draw to the next root and stop there
+// ═════════════════════════════════════════════════════════════════
+const ANIM_SPEED       = 260;   // CSS px of curve per second
+const ANIM_DWELL       = 450;   // ms pause at each root / asymptote during continuous play
+const ANIM_NEAR_BEFORE = 70;    // CSS px: a root / asymptote is highlighted from this far ahead of the pen…
+const ANIM_NEAR_AFTER  = 25;    // …until the pen is this far past it
+const ANIM_PAD         = 40;    // CSS px above / below the window counted as curve length
+
+const ANIM = { on: false, x: 0, play: null, dwellUntil: 0, last: 0, raf: 0, hotKey: '', stoppedAt: null };
+
+// move the pen left by `budget` px of curve; returns 'end', a feature x it stopped at, or null
+function animAdvance(budget){
+  const poles = TOOL.analyze(S).asymps, feats = TOOL.features(S);
+  const span = xMax - xMin, gap = span * 1e-7, dx = 0.5 * span / W;
+  const isPole = v => poles.some(p => Math.abs(p - v) < 1e-9);
+  const pyAt = x => { const y = TOOL.f(S, x); return isFinite(y) ? clamp(Y(y), -ANIM_PAD, H + ANIM_PAD) : null; };
+  let x = ANIM.x, py = pyAt(x);
+  for(let guard = 0; budget > 0 && guard < 20000; guard++){
+    if(x <= xMin){ ANIM.x = xMin; return 'end'; }
+    let nx = Math.max(x - dx, xMin);
+    // the next root / asymptote to the left: stop on it (just right of it for a pole).
+    // "Next" includes one the pen is exactly on, unless the pen already stopped there.
+    const next = feats.find(v => v <= x + 2 * gap && !(ANIM.stoppedAt !== null && Math.abs(v - ANIM.stoppedAt) < 1e-9));
+    let stop = null;
+    if(next !== undefined && next >= nx){ nx = isPole(next) ? next + gap : next; stop = next; }
+    // leaving a stop just right of a pole: jump across it (no length)
+    const across = poles.find(p => p < x && p > nx);
+    if(across !== undefined){ x = across - gap; py = pyAt(x); continue; }
+    const npy = pyAt(nx), run = (x - nx) / span * W;
+    budget -= (npy !== null && py !== null) ? Math.hypot(run, npy - py) : run;
+    x = nx; if(npy !== null) py = npy;
+    if(stop !== null){ ANIM.x = x; ANIM.stoppedAt = stop; return stop; }
+  }
+  ANIM.x = x;
+  return x <= xMin ? 'end' : null;
+}
+
+// redraw while animating; the formula only when the highlighted factors change
+function animRefresh(){
+  draw(ctx);
+  const key = TOOL.hotX(S, api).join(',');
+  if(key !== ANIM.hotKey){ ANIM.hotKey = key; updateFormula(); }
+  animButtons();
+}
+
+function animFrame(t){
+  if(!ANIM.play){ ANIM.raf = 0; return; }
+  const dt = Math.min(50, t - (ANIM.last || t)); ANIM.last = t;
+  if(t >= ANIM.dwellUntil){
+    const r = animAdvance(ANIM_SPEED * dt / 1000);
+    if(r === 'end') ANIM.play = null;
+    else if(r !== null){                                   // reached a root / asymptote
+      if(ANIM.play === 'step') ANIM.play = null;
+      else ANIM.dwellUntil = t + ANIM_DWELL;
+    }
+    animRefresh();
+  }
+  ANIM.raf = ANIM.play ? requestAnimationFrame(animFrame) : 0;
+}
+
+function animStart(kind){
+  if(!ANIM.on) return;
+  if(ANIM.x <= xMin + (xMax - xMin) * 1e-6 || ANIM.x > xMax){   // finished, or drawn part off to the right:
+    ANIM.x = xMax; ANIM.stoppedAt = null;                         // start over
+  }
+  ANIM.play = kind; ANIM.dwellUntil = 0; ANIM.last = 0;
+  if(!ANIM.raf) ANIM.raf = requestAnimationFrame(animFrame);
+  animButtons();
+}
+function animPause(){ ANIM.play = null; animButtons(); }
+function animRestart(){ ANIM.play = null; ANIM.x = xMax; ANIM.stoppedAt = null; animRefresh(); }
+function animToggle(){
+  ANIM.on = !ANIM.on;
+  ANIM.play = null; ANIM.x = xMax; ANIM.hotKey = ''; ANIM.stoppedAt = null;
+  const sw = document.getElementById('anim-lock');
+  sw.classList.toggle('on', ANIM.on); sw.setAttribute('aria-checked', String(ANIM.on));
+  document.getElementById('anim-row').classList.toggle('on', ANIM.on);
+  render(); animButtons();
+}
+
+const ICON_PLAY  = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><polygon points="2.5,8 13.5,1.5 13.5,14.5" fill="currentColor"/></svg>';
+const ICON_PAUSE = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.4" height="12" rx="0.8" fill="currentColor"/><rect x="9.6" y="2" width="3.4" height="12" rx="0.8" fill="currentColor"/></svg>';
+function animButtons(){
+  const play = document.getElementById('anim-play'), step = document.getElementById('anim-step');
+  const running = ANIM.play === 'run';
+  if(play.dataset.state !== String(running)){ play.innerHTML = running ? ICON_PAUSE : ICON_PLAY; play.dataset.state = String(running); }
+  play.classList.toggle('playing', running);
+  play.title = running ? 'Pause (Space)' : 'Draw to the left edge (Space)';
+  step.classList.toggle('playing', ANIM.play === 'step');
+}
+
+document.getElementById('anim-lock').addEventListener('click', animToggle);
+document.getElementById('anim-lock').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); animToggle(); }
+});
+document.getElementById('anim-play').addEventListener('click', () => ANIM.play === 'run' ? animPause() : animStart('run'));
+document.getElementById('anim-step').addEventListener('click', () => animStart('step'));
+document.getElementById('anim-restart').addEventListener('click', animRestart);
+// keyboard (also works with presentation clickers that send PageDown)
+document.addEventListener('keydown', e => {
+  if(!ANIM.on || e.ctrlKey || e.metaKey || e.altKey) return;
+  if(e.target.closest && e.target.closest('input, textarea')) return;
+  if(e.key === ' '){ e.preventDefault(); ANIM.play === 'run' ? animPause() : animStart('run'); }
+  else if(e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft' || e.key === 'PageDown'){ e.preventDefault(); animStart('step'); }
+  else if(e.key === 'r' || e.key === 'R' || e.key === 'Home'){ e.preventDefault(); animRestart(); }
+});
+animButtons();
+
+// ═════════════════════════════════════════════════════════════════
+//  RATIONAL TOOL — PAGE CONTROLS  (scale slider, right-click menu)
+// ═════════════════════════════════════════════════════════════════
+document.getElementById('scale-slider').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  S.a = intMode ? Math.round(v) : Math.round(v * 10) / 10;
+  if(S.a === 0) S.a = 0;                           // no negative zero
+  render();
+});
+
+// right-click (or long-press) near the x-axis: add a root / asymptote,
+// or duplicate / remove the dot under the pointer
+const ctxMenu = document.getElementById('ctx-menu');
+const menuBtn = id => document.getElementById(id);
+let ctxState = null;   // { x, numIdx, denIdx }
+
+function hideMenu(){ ctxMenu.style.display = 'none'; ctxState = null; }
+function showMenu(cx, cy){
+  ctxMenu.style.display = 'block';
+  const w = ctxMenu.offsetWidth, h = ctxMenu.offsetHeight;
+  ctxMenu.style.left = (cx + w > window.innerWidth  ? cx - w : cx) + 'px';
+  ctxMenu.style.top  = (cy + h > window.innerHeight ? cy - h : cy) + 'px';
+}
+
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  resetInteraction();                              // a long-press may have started a pan
+  if(ANIM.on){ hideMenu(); return; }               // roots / asymptotes are locked while animating
+  const [px, py] = getPos(e);
+  if(Math.abs(py - Y(0)) > 18){ hideMenu(); return; }
+  const nearest = list => {                        // index of the closest dot within reach, or −1
+    let best = -1;
+    list.forEach((r, i) => {
+      const d = Math.abs(X(r) - px);
+      if(d < HIT() && (best < 0 || d < Math.abs(X(list[best]) - px))) best = i;
+    });
+    return best;
+  };
+  const x = intMode ? (Math.round(invX(px)) || 0) : snap(invX(px), stepX());
+  ctxState = { x, numIdx: nearest(S.num), denIdx: nearest(S.den) };
+  const onDot = ctxState.numIdx >= 0 || ctxState.denIdx >= 0;
+  const vis = { 'ctx-add-root': !onDot,
+                'ctx-dup-root': ctxState.numIdx >= 0, 'ctx-rem-root': ctxState.numIdx >= 0 };
+  for(const [id, v] of Object.entries(vis)) menuBtn(id).style.display = v ? 'block' : 'none';
+  showMenu(e.clientX, e.clientY);
+});
+
+function menuAction(id, act){
+  menuBtn(id).addEventListener('click', () => {
+    if(!ctxState) return;
+    act(ctxState);
+    hideMenu();
+    activeIds = new Set();                         // handle ids shift when dots come and go
+    render();
+  });
+}
+menuAction('ctx-add-root',  st => S.num.push(st.x));
+menuAction('ctx-dup-root',  st => S.num.push(S.num[st.numIdx]));
+menuAction('ctx-rem-root',  st => S.num.splice(st.numIdx, 1));
+
+// ── degree buttons: load evenly spread default roots and fit the window ──
 const DEFAULT_ROOTS = {
   1: [0],
   2: [-1, 1],
@@ -144,351 +1553,38 @@ const DEFAULT_ROOTS = {
   4: [-2, -1, 1, 2],
   5: [-2, -1, 0, 1, 2],
   6: [-2, -1.4, -0.6, 0.6, 1.4, 2],
-  7: [-2, -1.4, -0.6, 0, 0.6, 1.4, 2]
+  7: [-2, -1.4, -0.6, 0, 0.6, 1.4, 2],
 };
-
-let degree = 2;
-let roots = [...DEFAULT_ROOTS[2]];
-let scale = 1;           // the 'a' coefficient
-let dragging = null;
-let dragOffsetX = 0;
-let mathJaxReady = false;
-
-// ── MathJax init ──────────────────────────────────────────────────
-window.addEventListener('load', () => {
-  MathJax.startup.promise.then(() => {
-    mathJaxReady = true;
-    updateDisplay();
+for(let d = 1; d <= 7; d++){
+  const b = document.createElement('button');
+  b.className = 'deg-btn'; b.textContent = d; b.dataset.deg = d;
+  b.addEventListener('click', () => {
+    S.num = [...DEFAULT_ROOTS[d]];
+    if(intMode) TOOL.roundToInt(S);
+    resetView();
+    if(ANIM.on){ ANIM.play = null; ANIM.x = xMax; ANIM.stoppedAt = null; animButtons(); }
+    activeIds = new Set();
+    render();
   });
-});
-
-// ── canvas sizing & drawing ───────────────────────────────────────
-function setCanvasSize(){
-  const W = document.getElementById('canvas-wrap').clientWidth;
-  canvas.width  = W;
-  canvas.height = Math.round(W * 3/4);  // 4:3 aspect ratio
+  document.getElementById('deg-btns').appendChild(b);
 }
 
-function toCanvas(x, y){
-  const W=canvas.width, H=canvas.height;
-  return [(x-xMin)/(xMax-xMin)*W, (1-(y-yMin)/(yMax-yMin))*H];
-}
-function fromCanvas(px){ return xMin + px/canvas.width*(xMax-xMin); }
+document.addEventListener('pointerdown', e => { if(!ctxMenu.contains(e.target)) hideMenu(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape') hideMenu(); });
+canvas.addEventListener('wheel', hideMenu);
+window.addEventListener('blur', hideMenu);
 
-function evalPoly(x){
-  return scale * roots.reduce((a,r) => a*(x-r), 1);
-}
-
-function getColors(){
-  const d = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  return {
-    axis:  d?'rgba(255,255,255,0.2)' :'rgba(0,0,0,0.15)',
-    grid:  d?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.05)',
-    curve: d?'#85B7EB':'#185FA5',
-    root:  d?'#F09595':'#E24B4A',
-    rootS: d?'#E24B4A':'#A32D2D',
-    text:  d?'rgba(255,255,255,0.45)':'rgba(0,0,0,0.35)',
-    bg:    d?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.02)'
-  };
-}
-
-function draw(){
-  const W=canvas.width, H=canvas.height, C=getColors();
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
-
-  // grid
-  ctx.strokeStyle=C.grid; ctx.lineWidth=1;
-  for(let x=Math.ceil(xMin);x<=Math.floor(xMax);x++){
-    const[px]=toCanvas(x,0);
-    ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();
-  }
-  for(let y=Math.ceil(yMin/2)*2;y<=Math.floor(yMax/2)*2;y+=2){
-    const[,py]=toCanvas(0,y);
-    ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();
-  }
-
-  // axes
-  const[ox,oy]=toCanvas(0,0);
-  ctx.strokeStyle=C.axis; ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(toCanvas(xMin,0)[0],oy);ctx.lineTo(toCanvas(xMax,0)[0],oy);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(ox,toCanvas(0,yMin)[1]);ctx.lineTo(ox,toCanvas(0,yMax)[1]);ctx.stroke();
-
-  // axis labels
-  ctx.fillStyle=C.text; ctx.font='14px system-ui,sans-serif';
-  ctx.textAlign='center';
-  for(let x=Math.ceil(xMin);x<=Math.floor(xMax);x++){
-    if(!x)continue;
-    const[px]=toCanvas(x,0);
-    ctx.fillText(x,px,oy+16);
-  }
-  ctx.textAlign='right';
-  for(let y=Math.ceil(yMin/2)*2;y<=Math.floor(yMax/2)*2;y+=2){
-    if(!y)continue;
-    const[,py]=toCanvas(0,y);
-    ctx.fillText(y,ox-6,py+4);
-  }
-
-  // curve — clip to canvas bounds so we can always lineTo with no boundary gaps
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, W, H);
-  ctx.clip();
-
-  ctx.strokeStyle=C.curve; ctx.lineWidth=3; ctx.lineJoin='round';
-  ctx.beginPath();
-  if(scale === 0){
-    // f(x) = 0 identically — draw along the x-axis
-    const[,py]=toCanvas(0,0);
-    ctx.moveTo(toCanvas(xMin,0)[0],py);
-    ctx.lineTo(toCanvas(xMax,0)[0],py);
-  } else {
-    let started=false;
-    const steps=W*2;
-    for(let i=0;i<=steps;i++){
-      const x=xMin+(i/steps)*(xMax-xMin);
-      const y=evalPoly(x);
-      if(!isFinite(y)){ started=false; continue; }
-      const[px,py]=toCanvas(x,y);
-      if(!started){ctx.moveTo(px,py);started=true;}
-      else ctx.lineTo(px,py);
-    }
-  }
-  ctx.stroke();
-  ctx.restore();
-
-  // root dots — drawn outside clip so they're never cut at the boundary
-  const[,ry]=toCanvas(0,0);
-  roots.forEach(r=>{
-    const[rx]=toCanvas(r,0);
-    ctx.beginPath();ctx.arc(rx,ry,8,0,2*Math.PI);
-    ctx.fillStyle=C.root; ctx.fill();
-    ctx.strokeStyle=C.rootS; ctx.lineWidth=1.5; ctx.stroke();
-  });
-}
-
-// ── polynomial math ───────────────────────────────────────────────
-function sortedRoots(){ return [...roots].sort((a,b)=>a-b); }
-function isNice(v){ return Math.abs(v - Math.round(v*10)/10) < 1e-9; }
-
-function expandPoly(rs){
-  let c=[1];
-  for(const r of rs){
-    const n=new Array(c.length+1).fill(0);
-    for(let i=0;i<c.length;i++){n[i]+=c[i];n[i+1]-=r*c[i];}
-    c=n;
-  }
-  return c;
-}
-
-function coeffsAreExact(rs){
-  if(!isNice(scale)) return false;
-  return expandPoly(rs).every(c => isNice(scale * c));
-}
-
-function fmtNum(v){
-  const r=Math.round(v*10)/10;
-  if(Number.isInteger(r)) return String(Math.round(r));
-  return r.toFixed(1);
-}
-
-// LaTeX for a single (x - r) factor
-function latexFactor(r){
-  const v=Math.round(r*10)/10;
-  if(Math.abs(v)<1e-9) return 'x';
-  const av=fmtNum(Math.abs(v));
-  return v>0 ? `(x - ${av})` : `(x + ${av})`;
-}
-
-// LaTeX factored form, including the 'a' prefix
-function latexFactored(sr){
-  const THRESH=0.05;
-  const groups=[];
-  for(const r of sr){
-    const last=groups[groups.length-1];
-    if(last&&Math.abs(r-last.r)<THRESH) last.count++;
-    else groups.push({r,count:1});
-  }
-  const factors = groups.map(({r,count})=>{
-    const base=latexFactor(r);
-    return count===1 ? base : `${base}^{${count}}`;
-  }).join('\\,');
-
-  const av = fmtNum(Math.abs(scale));
-  if(scale === 0)  return `0 \\cdot ${factors}`;
-  if(scale === 1)  return factors;
-  if(scale === -1) return `-${factors}`;
-  if(scale > 0)    return `${av}\\,${factors}`;
-  /* scale < 0 */  return `-${av}\\,${factors}`;
-}
-
-// LaTeX for a single term in expanded form
-function latexCoeff(c, deg, isFirst){
-  const raw = Math.round(c*1000)/1000;
-  if(Math.abs(raw)<1e-9) return'';
-  const neg = raw<0;
-  const abs = Math.abs(raw);
-  const numStr = abs===1&&deg>0 ? '' : fmtNum(abs);
-  const varPart = deg===0?'' : deg===1?'x' : `x^{${deg}}`;
-  return isFirst ? `${neg?'-':''}${numStr}${varPart}`
-                 : `${neg?' - ':' + '}${numStr}${varPart}`;
-}
-
-// Full expanded standard form, coefficients already multiplied by scale
-function latexStandard(rs){
-  if(scale === 0) return '0';
-  const coeffs = expandPoly(rs).map(c => scale*c);
-  const n = coeffs.length-1;
-  const parts=[];
-  for(let i=0;i<=n;i++){
-    const p=latexCoeff(coeffs[i],n-i,i===0);
-    if(p) parts.push(p);
-  }
-  return parts.length ? parts.join('') : '0';
-}
-
-function buildLatex(){
-  const sr = sortedRoots();
-  const factored = latexFactored(sr);
-  const standard = latexStandard(sr);
-  const rel = coeffsAreExact(sr) ? '=' : '\\approx';
-  return `\\(\\begin{aligned} f(x) &= ${factored} \\\\ &${rel} ${standard} \\end{aligned}\\)`;
-}
-
-let renderPending = false;
-function updateDisplay(){
-  if(!mathJaxReady) return;
-  const el = document.getElementById('math-output');
-  el.innerHTML = buildLatex();
-  if(renderPending) return;
-  renderPending = true;
-  MathJax.typesetPromise([el]).then(()=>{ renderPending=false; });
-}
-
-// ── scale slider ──────────────────────────────────────────────────
-const slider   = document.getElementById('scale-slider');
-const scaleVal = document.getElementById('scale-val');
-
-slider.addEventListener('input', () => {
-  scale = Math.round(parseFloat(slider.value)*10)/10;
-  scaleVal.textContent = fmtNum(scale);
-  draw(); updateDisplay();
-});
-
-// ── canvas interaction ────────────────────────────────────────────
-function resizeCanvas(){ setCanvasSize(); draw(); }
-
-let panning = null;   // math-space anchor while panning
-
-function hitTest(cx,cy){
-  const[,ry]=toCanvas(0,0);
-  for(let i=roots.length-1;i>=0;i--){
-    const[rx]=toCanvas(roots[i],0), dx=cx-rx, dy=cy-ry;
-    if(dx*dx+dy*dy<14*14) return i;
-  }
-  return -1;
-}
-
-function getPos(e){
-  const r=canvas.getBoundingClientRect(), s=canvas.width/r.width;
-  if(e.touches) return[(e.touches[0].clientX-r.left)*s,(e.touches[0].clientY-r.top)*s];
-  return[(e.clientX-r.left)*s,(e.clientY-r.top)*s];
-}
-
-canvas.addEventListener('mousedown',e=>{
-  const[cx,cy]=getPos(e), idx=hitTest(cx,cy);
-  if(idx>=0){
-    dragging=idx; dragOffsetX=cx-toCanvas(roots[idx],0)[0];
-    canvas.style.cursor='grabbing';
-  } else {
-    panning={ mx: xMin+(cx/canvas.width)*(xMax-xMin),
-              my: yMin+(1-cy/canvas.height)*(yMax-yMin) };
-    canvas.style.cursor='move';
-  }
-});
-canvas.addEventListener('mousemove',e=>{
-  const[cx,cy]=getPos(e);
-  if(dragging!==null){
-    let nx=Math.round(fromCanvas(cx-dragOffsetX)*10)/10;
-    nx=Math.max(xMin,Math.min(xMax,nx));
-    roots[dragging]=nx; draw(); updateDisplay();
-  } else if(panning){
-    const mx=xMin+(cx/canvas.width)*(xMax-xMin);
-    const my=yMin+(1-cy/canvas.height)*(yMax-yMin);
-    xMin+=panning.mx-mx; xMax+=panning.mx-mx;
-    yMin+=panning.my-my; yMax+=panning.my-my;
-    draw();
-  } else {
-    canvas.style.cursor=hitTest(cx,cy)>=0?'grab':'default';
-  }
-});
-function stopDrag(){ dragging=null; panning=null; canvas.style.cursor='default'; }
-canvas.addEventListener('mouseup',stopDrag);
-canvas.addEventListener('mouseleave',stopDrag);
-
-canvas.addEventListener('touchstart',e=>{
-  e.preventDefault();
-  const[cx,cy]=getPos(e), idx=hitTest(cx,cy);
-  if(idx>=0){
-    dragging=idx; dragOffsetX=cx-toCanvas(roots[idx],0)[0];
-  } else {
-    panning={ mx: xMin+(cx/canvas.width)*(xMax-xMin),
-              my: yMin+(1-cy/canvas.height)*(yMax-yMin) };
-  }
-},{passive:false});
-canvas.addEventListener('touchmove',e=>{
-  e.preventDefault();
-  const[cx,cy]=getPos(e);
-  if(dragging!==null){
-    let nx=Math.round(fromCanvas(cx-dragOffsetX)*10)/10;
-    nx=Math.max(xMin,Math.min(xMax,nx));
-    roots[dragging]=nx; draw(); updateDisplay();
-  } else if(panning){
-    const mx=xMin+(cx/canvas.width)*(xMax-xMin);
-    const my=yMin+(1-cy/canvas.height)*(yMax-yMin);
-    xMin+=panning.mx-mx; xMax+=panning.mx-mx;
-    yMin+=panning.my-my; yMax+=panning.my-my;
-    draw();
-  }
-},{passive:false});
-canvas.addEventListener('touchend',stopDrag);
-
-// scroll to zoom, centered on mouse position
-canvas.addEventListener('wheel',e=>{
-  e.preventDefault();
-  const factor=e.deltaY>0?1.15:1/1.15;
-  const[cpx,cpy]=getPos(e);
-  const mouseX=xMin+(cpx/canvas.width)*(xMax-xMin);
-  const mouseY=yMin+(1-cpy/canvas.height)*(yMax-yMin);
-  xMin=mouseX+(xMin-mouseX)*factor; xMax=mouseX+(xMax-mouseX)*factor;
-  yMin=mouseY+(yMin-mouseY)*factor; yMax=mouseY+(yMax-mouseY)*factor;
-  draw();
-},{passive:false});
-
-// double-click to reset view
-canvas.addEventListener('dblclick',()=>{
-  xMin=XMIN0; xMax=XMAX0; yMin=YMIN0; yMax=YMAX0;
-  draw();
-});
-
-// ── degree buttons ────────────────────────────────────────────────
-const db=document.getElementById('deg-btns');
-[1,2,3,4,5,6,7].forEach(d=>{
-  const btn=document.createElement('button');
-  btn.className='deg-btn'+(d===degree?' active':'');
-  btn.textContent=d;
-  btn.addEventListener('click',()=>{
-    degree=d;
-    roots=[...DEFAULT_ROOTS[d]];
-    document.querySelectorAll('.deg-btn').forEach((b,j)=>b.classList.toggle('active',j+1===d));
-    draw(); updateDisplay();
-  });
-  db.appendChild(btn);
-});
-
-window.addEventListener('resize',resizeCanvas);
-resizeCanvas();
-// updateDisplay fires once MathJax is ready (see top of script)
+// ─────────────────────────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────────────────────────
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+window.addEventListener('resize', () => { hideMenu(); setCanvasSize(); render(); });
+loadFromURL();
+if(!new URLSearchParams(location.search).has('v')) resetView();   // fit the window to the loaded graph
+applyIntLock();
+document.title = TOOL.title;
+setCanvasSize();
+render();
 </script>
 </body>
 </html>

@@ -84,26 +84,42 @@ canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
 #action-row button:hover { background: #f0f0f0; }
 #action-row button.copied { background: #d4edda; border-color: #82c99a; color: #1a6b32; }
 
+#int-lock { margin-left: auto; }
 #hint { margin-top: 0.6rem; font-size: 11px; color: #999; }
+#touch-log { display: none; margin-top: 0.6rem; font: 11px/1.35 ui-monospace, monospace; white-space: pre; overflow-x: auto; color: #555; background: #f5f5f5; border-radius: 6px; padding: 6px 8px; }
 
 /* ── integer-lock switch (shown only for tools that support it) ── */
-#int-lock {
-  margin-left: auto;
+.switch {
   display: none; align-items: center; gap: 8px;
   font-size: 13px; color: #555;
   cursor: pointer; user-select: none;
 }
-#int-lock .track {
+.switch .track {
   position: relative; width: 40px; height: 22px; border-radius: 11px;
   background: #ccc; transition: background 0.2s; flex-shrink: 0;
 }
-#int-lock .thumb {
+.switch .thumb {
   position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
   background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: left 0.2s;
 }
-#int-lock.on .track { background: #185FA5; }
-#int-lock.on .thumb { left: 20px; }
-#int-lock.on { color: #185FA5; font-weight: 600; }
+.switch.on .track { background: #185FA5; }
+.switch.on .thumb { left: 20px; }
+.switch.on { color: #185FA5; font-weight: 600; }
+
+/* ── animation controls ── */
+#anim-row { display: flex; align-items: center; gap: 12px; margin-top: 0.75rem; min-height: 36px; }
+#anim-lock { display: flex; }
+#anim-controls { display: none; gap: 6px; }
+#anim-row.on #anim-controls { display: flex; }
+#anim-controls button {
+  width: 44px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 7px; border: 0.5px solid #bbb;
+  background: transparent; color: #0D2A3A; cursor: pointer; padding: 0;
+  transition: background 0.13s, color 0.13s;
+}
+#anim-controls button:hover { background: #f0f0f0; }
+#anim-controls button.playing { background: #0D2A3A; color: #fff; border-color: #0D2A3A; }
 
 /* ── rational tool: scale slider, legend, right-click menu ── */
 #scale-row { display: flex; align-items: center; gap: 12px; margin-top: 0.85rem; }
@@ -167,10 +183,14 @@ canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
   #action-row button:hover { background: #2a2a2a; }
   #action-row button.copied { background: #1a3d25; border-color: #3a8a52; color: #7dcf97; }
   #hint { color: #777; }
-  #int-lock { color: #aaa; }
-  #int-lock .track { background: #444; }
-  #int-lock.on { color: #85B7EB; }
+  #touch-log { color: #aaa; background: #242424; }
+  .switch { color: #aaa; }
+  .switch .track { background: #444; }
+  .switch.on { color: #85B7EB; }
 
+  #anim-controls button { border-color: #555; color: #E4E8EC; }
+  #anim-controls button:hover { background: #2a2a2a; }
+  #anim-controls button.playing { background: #E4E8EC; color: #111; border-color: #E4E8EC; }
   #scale-row label, #scale-val { color: #7FB8E0; }
   #scale-slider { background: #444; }
   #scale-slider::-webkit-slider-thumb { background: #7FB8E0; border-color: #3D8BC0; }
@@ -205,6 +225,22 @@ canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
   </div>
 </div>
 
+<div id="anim-row">
+  <div id="anim-lock" class="switch" role="switch" aria-checked="false" tabindex="0" title="Erase the graph and draw it from right to left">
+    <span>Animate</span>
+    <div class="track"><div class="thumb"></div></div>
+  </div>
+  <div id="anim-controls">
+    <button id="anim-restart" title="Erase and start again at the right edge (R)">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><polygon points="9.6,1.2 13.8,3.2 10.6,6.6" fill="currentColor"/></svg>
+    </button>
+    <button id="anim-play" title="Draw to the left edge (Space)"></button>
+    <button id="anim-step" title="Draw to the next root or asymptote (N or ←)">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="2.2" height="12" rx="0.6" fill="currentColor"/><polygon points="5.5,8 14,2.5 14,13.5" fill="currentColor"/></svg>
+    </button>
+  </div>
+</div>
+
 <div id="scale-row">
   <label for="scale-slider">scale <i>a</i></label>
   <input type="range" id="scale-slider" min="-5" max="5" step="0.1" value="1">
@@ -221,13 +257,14 @@ canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
 <div id="action-row">
   <button id="btn-export">&#x2193; Export PNG</button>
   <button id="btn-share">&#x1F517; Copy link</button>
-  <div id="int-lock" role="switch" aria-checked="false" tabindex="0" title="Lock all values to integers">
+  <div id="int-lock" class="switch" role="switch" aria-checked="false" tabindex="0" title="Lock all values to integers">
     <span>Integers only</span>
     <div class="track"><div class="thumb"></div></div>
   </div>
 </div>
 
-<div id="hint">Drag the colored points (or a dashed asymptote) &nbsp;·&nbsp; Drag empty space to pan &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Double-click to reset view &nbsp;·&nbsp; Right-click the x-axis to add, remove, or duplicate roots / asymptotes</div>
+<div id="hint">Drag the colored points (or a dashed asymptote) &nbsp;·&nbsp; Drag empty space to pan &nbsp;·&nbsp; Scroll or pinch to zoom &nbsp;·&nbsp; Double-click to fit the view to the graph &nbsp;·&nbsp; Right-click the x-axis to add, remove, or duplicate roots / asymptotes &nbsp;·&nbsp; Animate (roots / asymptotes locked): Space = play / pause, N or ← = next root / asymptote, R = restart</div>
+<div id="touch-log"></div>
 
 <div id="ctx-menu">
   <button id="ctx-add-root">Add root here</button>
@@ -253,6 +290,9 @@ canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
 // dot is pulled onto a nearby dot (MAGNET px) so equal roots are easy to make at any zoom.
 // The horizontal (deg num < deg den: y = 0;  equal: y = a) or slant (one more: a line)
 // asymptote is drawn dashed in amber when the graph has a vertical asymptote.
+// ANIMATION MODE (see ANIM below): the curve is hidden and then drawn from the right edge of
+// the window leftwards at constant on-screen speed; roots / asymptotes near the pen are
+// highlighted on the graph and in the factored formula.
 
 const RATIONAL = (() => {
   const same  = (u, v) => Math.abs(u - v) < 1e-9;
@@ -352,7 +392,7 @@ const RATIONAL = (() => {
   }
 
   // factored form with multiplicities as powers, sorted, each factor coloured
-  function factoredTex(roots, name, col, fmt){
+  function factoredTex(roots, name, col, fmt, hot = []){
     if(!roots.length) return '1';
     const groups = [];
     for(const r of [...roots].sort((u, v) => u - v)){
@@ -361,10 +401,30 @@ const RATIONAL = (() => {
     }
     return groups.map(({ r, n }) => {
       const pow = n > 1 ? `^{${n}}` : '';
-      if(r === 0) return col(name, 'x' + pow);
-      return `\\left(${col(name, `x ${r < 0 ? '+' : '-'} ${fmt(Math.abs(r))}`)}\\right)${pow}`;
+      const t = r === 0 ? col(name, 'x' + pow)
+              : `\\left(${col(name, `x ${r < 0 ? '+' : '-'} ${fmt(Math.abs(r))}`)}\\right)${pow}`;
+      return hot.some(v => same(v, r)) ? `\\colorbox{${highlight()}}{$${t}$}` : t;
     }).join('');
   }
+
+  // animation: distinct roots / asymptotes, right to left
+  function features(S){
+    const out = [];
+    for(const v of [...S.num, ...S.den].sort((u, w) => w - u)) if(!out.some(u => same(u, v))) out.push(v);
+    return out;
+  }
+  // features "in play":  the one the pen is at; otherwise the next one ahead (within
+  // NEAR_BEFORE px) and any just passed (within NEAR_AFTER px)
+  function hotX(S, api){
+    if(!ANIM.on) return [];
+    const px = api.X(ANIM.x);
+    const fs = features(S).map(v => ({ v, d: px - api.X(v) }));     // d > 0: still ahead of the pen
+    const at = fs.filter(o => Math.abs(o.d) < 1.5);
+    if(at.length) return at.map(o => o.v);
+    const ahead = fs.filter(o => o.d > 0 && o.d <= ANIM_NEAR_BEFORE)[0];   // nearest ahead (list is right → left)
+    return [...(ahead ? [ahead.v] : []), ...fs.filter(o => o.d < 0 && o.d >= -ANIM_NEAR_AFTER).map(o => o.v)];
+  }
+  const highlight = () => isDark() ? '#5C4D12' : '#FFE28A';
 
   const amber  = C => C.dark ? 'rgba(255,220,60,0.85)'  : 'rgba(180,140,0,0.80)';
   const violet = C => C.dark ? 'rgba(180,130,220,0.55)' : 'rgba(130,60,180,0.45)';
@@ -379,6 +439,64 @@ const RATIONAL = (() => {
 
     // x-values the curve must not be drawn across (true vertical asymptotes)
     breaks: S => analyze(S).asymps,
+    // animation mode: only the part already drawn (from the pen to the right edge)
+    curveRange: () => ANIM.on ? [ANIM.x, Infinity] : null,
+    analyze, features, hotX,
+
+    // ── a window fitted to the graph (double-click, and first load without a saved view) ──
+    // x: every root and asymptote (and the y-axis when it is nearby), padded on both sides.
+    // y: the "interesting" heights: 0, local maxima / minima, holes, the y-intercept, the
+    //    lowest point (nearest the x-axis) of every branch between vertical asymptotes, the
+    //    horizontal asymptote, and (when the graph levels off toward a horizontal or slant
+    //    asymptote) the heights at the window's edges, all with margin.  The height is kept
+    //    comparable to the width (unless the graph is very flat), so branches near vertical
+    //    asymptotes look like curves heading off rather than vertical walls.
+    autoView(S){
+      const A = analyze(S), fx = features(S);
+      let lo = fx.length ? Math.min(...fx) : 0, hi = fx.length ? Math.max(...fx) : 0;
+      const reach = Math.max(hi - lo, 2);
+      if(lo - reach <= 0 && 0 <= hi + reach){ lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+      const padX = Math.max(1.5, 0.5 * (hi - lo));
+      let x0 = lo - padX, x1 = hi + padX;
+      const tx = niceTick(x1 - x0);
+      x0 = Math.floor(x0 / tx) * tx; x1 = Math.ceil(x1 / tx) * tx;
+      const xSpan = x1 - x0, delta = 0.06 * xSpan, poles = A.asymps;
+
+      const pts = [0];
+      const away = x => poles.every(p => Math.abs(x - p) >= delta * 0.999);
+      const add = x => { const y = f(S, x); if(isFinite(y)) pts.push(y); };
+      for(const h of A.holes) if(isFinite(h.y)) pts.push(h.y);
+      if(away(0)) add(0);
+      if(A.degDiff <= 0 || (A.degDiff === 1 && poles.length)){ if(away(x0)) add(x0); if(away(x1)) add(x1); }
+      if(poles.length && A.degDiff === 0) pts.push(S.a);
+      // local maxima / minima, sampled away from the poles
+      const N = 800;
+      let y1 = null, y2 = null;                       // previous two samples
+      for(let i = 0; i <= N; i++){
+        const x = x0 + i / N * xSpan, y = away(x) ? f(S, x) : NaN;
+        if(!isFinite(y)){ y1 = y2 = null; continue; }
+        if(y1 !== null && y2 !== null && (y1 - y2) * (y - y1) < 0) pts.push(y1);
+        y2 = y1; y1 = y;
+      }
+      // every branch (piece between vertical asymptotes) must reach into the window:
+      // include the height where each branch comes closest to the x-axis
+      const cuts = [x0, ...poles.filter(p => p > x0 && p < x1).sort((u, v) => u - v), x1];
+      for(let k = 0; k + 1 < cuts.length; k++){
+        let best = null;
+        for(let i = 1; i < 200; i++){
+          const y = f(S, cuts[k] + (cuts[k + 1] - cuts[k]) * i / 200);
+          if(isFinite(y) && (best === null || Math.abs(y) < Math.abs(best))) best = y;
+        }
+        if(best !== null) pts.push(best);
+      }
+
+      const lowY = Math.min(...pts), highY = Math.max(...pts), h = highY - lowY;
+      const span = h < 1e-9 ? 1.2 * xSpan : Math.max(1.4 * h, Math.min(1.2 * xSpan, 6 * h));
+      const mid = (lowY + highY) / 2, ty = niceTick(span);
+      const tidy = v => parseFloat(v.toPrecision(12));          // no floating-point dust
+      return { xMin: tidy(x0), xMax: tidy(x1),
+               yMin: tidy(Math.floor((mid - span / 2) / ty) * ty), yMax: tidy(Math.ceil((mid + span / 2) / ty) * ty) };
+    },
 
     // "Integers only" switched on
     roundToInt(S){
@@ -411,7 +529,8 @@ const RATIONAL = (() => {
       g.setLineDash([6, 4]); g.lineCap = 'butt';
       g.strokeStyle = violet(C);
       for(const x of [...new Set(S.den)]){
-        const hot = S.den.some((s, i) => same(s, x) && api.active.has('d' + i));
+        const hot = S.den.some((s, i) => same(s, x) && api.active.has('d' + i))
+                 || hotX(S, api).some(v => same(v, x));
         g.lineWidth = hot ? 4.5 : 3;
         g.beginPath(); g.moveTo(X(x), 0); g.lineTo(X(x), H); g.stroke();
       }
@@ -449,8 +568,9 @@ const RATIONAL = (() => {
         list[i] = x;
       };
       const yl = [api.invY(0), api.invY(api.H)];
-      const nums = S.num.map((x, i) => ({ id: 'n' + i, color: 'red', r: 8, axis: 'x', x, y: 0, drag: move(S.num, i) }));
-      const dens = S.den.map((x, i) => ({ id: 'd' + i, color: 'purple', r: 8, axis: 'x', x, y: 0,
+      const locked = ANIM.on;                                   // animation mode: dots stay put
+      const nums = S.num.map((x, i) => ({ id: 'n' + i, color: 'red', r: 8, axis: 'x', x, y: 0, locked, drag: move(S.num, i) }));
+      const dens = S.den.map((x, i) => ({ id: 'd' + i, color: 'purple', r: 8, axis: 'x', x, y: 0, locked,
                                           seg: [x, yl[0], x, yl[1]], drag: move(S.den, i) }));
       return [...dens.filter(h => isHole(h.x)), ...nums, ...dens.filter(h => !isHole(h.x))];
     },
@@ -459,8 +579,22 @@ const RATIONAL = (() => {
     labels(g, S, api, C, active){
       const { X, Y } = api;
       const A = analyze(S);
+      if(ANIM.on){
+        // soft halo around the dots in play, and the pen tip
+        g.save();
+        g.strokeStyle = highlight(); g.lineWidth = 4;
+        for(const v of hotX(S, api)){ g.beginPath(); g.arc(X(v), Y(0), 14, 0, 2 * Math.PI); g.stroke(); }
+        const yt = f(S, ANIM.x);
+        if(isFinite(yt) && ANIM.x < api.invX(api.W)){
+          g.beginPath(); g.arc(X(ANIM.x), Y(yt), 5.5, 0, 2 * Math.PI);
+          g.fillStyle = C.curve; g.fill();
+          g.strokeStyle = highlight(); g.lineWidth = 2.5; g.stroke();
+        }
+        g.restore();
+      }
       for(const h of A.holes){
         if(!isFinite(h.y)) continue;
+        if(ANIM.on && h.x < ANIM.x) continue;              // not drawn yet
         g.save();
         g.beginPath(); g.arc(X(h.x), Y(h.y), 6, 0, 2 * Math.PI);
         g.fillStyle = paper(C); g.fill();
@@ -482,13 +616,14 @@ const RATIONAL = (() => {
       });
     },
 
-    tex(S, col, fmt){
+    tex(S, col, fmt, api){
+      const hot = hotX(S, api);
       if(S.a === 0) return 'f(x) = 0';
       const aT = S.a === 1 ? '' : S.a === -1 ? '-' : fmt(S.a);
       const lead = aT === '' ? '' : col('blue', aT) + (aT === '-' ? '' : '\\,');
       const body = (N, D) => S.den.length ? `${lead}\\dfrac{${N}}{${D}}`
                            : S.num.length ? `${lead}${N}` : col('blue', fmt(S.a));
-      const line1 = body(factoredTex(S.num, 'red', col, fmt), factoredTex(S.den, 'purple', col, fmt));
+      const line1 = body(factoredTex(S.num, 'red', col, fmt, hot), factoredTex(S.den, 'purple', col, fmt, hot));
       if(S.num.length < 2 && S.den.length < 2)
         return `\\begin{aligned} f(x) &= ${line1} \\end{aligned}`;
       const cn = expand(S.num), cd = expand(S.den);
@@ -510,15 +645,18 @@ const RATIONAL = (() => {
 const TOOL = RATIONAL;
 
 // ═════════════════════════════════════════════════════════════════
-//  SHARED GRAPHING CORE  (as in story_explorer_v6.html, plus three optional tool hooks:
+//  SHARED GRAPHING CORE  (as in story_explorer_v6.html, plus four optional tool hooks:
 //    TOOL.breaks(S)         x-values the curve is never drawn across (poles)
+//    TOOL.curveRange(S)     [lo, hi]: draw only this part of the curve (animation)
+//    TOOL.autoView(S)       the window double-click resets to (fitted to the graph)
 //    TOOL.encode / decode   URL state for tools whose values aren't plain numbers
 //    TOOL.sync(S, api)      refresh tool-owned page controls after each render)
 // ═════════════════════════════════════════════════════════════════
 const S = structuredClone(TOOL.defaults);  // current parameters (deep copy: may hold arrays)
 let intMode = false;                       // "Integers only" switch (tools read this)
 let xMin, xMax, yMin, yMax;
-function resetView(){ ({ xMin, xMax, yMin, yMax } = TOOL.view); }
+// TOOL.autoView(S), when present, computes a window that fits the current graph
+function resetView(){ ({ xMin, xMax, yMin, yMax } = TOOL.autoView ? TOOL.autoView(S) : TOOL.view); }
 resetView();
 
 // grab sizes in CSS px
@@ -657,9 +795,12 @@ function draw(g){
   // layer 2: the curve, one piece per interval between breaks (poles)
   const span = yMax - yMin, lo = yMin - 10 * span, hi = yMax + 10 * span;
   g.strokeStyle = C.curve; g.lineWidth = 3.5; g.lineJoin = 'round'; g.lineCap = 'round';
-  const cuts = (TOOL.breaks ? TOOL.breaks(S) : []).filter(c => c > xMin && c < xMax).sort((u, v) => u - v);
+  // optional TOOL.curveRange(): draw only part of the curve (animation)
+  const range = TOOL.curveRange ? TOOL.curveRange(S, api) : null;
+  const cL = range ? Math.max(xMin, range[0]) : xMin, cR = range ? Math.min(xMax, range[1]) : xMax;
+  const cuts = (TOOL.breaks ? TOOL.breaks(S) : []).filter(c => c > cL && c < cR).sort((u, v) => u - v);
   const gapX = (xMax - xMin) * 1e-7;                 // stop this close to a pole
-  const ends = [xMin, ...cuts.flatMap(c => [c - gapX, c + gapX]), xMax];
+  const ends = [cL, ...cuts.flatMap(c => [c - gapX, c + gapX]), cR];
   for(let j = 0; j < ends.length; j += 2){
     const xL = ends[j], xR = ends[j + 1];
     if(!(xR > xL)) continue;
@@ -701,6 +842,9 @@ function draw(g){
 
   // layer 6: tool tooltips / labels (top-most)
   if(TOOL.labels) TOOL.labels(g, S, api, C, activeIds);
+
+  // pinch badge and touch-debug overlay (live canvas only, never in exported PNGs)
+  if(g === ctx) drawTouchOverlay(g);
 }
 
 function drawArrows(g, h, C){
@@ -754,7 +898,7 @@ function candidates(px, py){
   const found = [];
   for(let i = hs.length - 1; i >= 0; i--){        // topmost first
     const h = hs[i];
-    if(h.disabled) continue;
+    if(h.disabled || h.locked) continue;
     let d;
     if(h.kind === 'vline'){
       d = Math.abs(px - X(h.x)) + 3;               // lines yield to dots
@@ -771,7 +915,7 @@ function candidates(px, py){
     for(let i = hs.length - 1; i >= 0; i--){
       const h = hs[i];
       const segs = h.segs || (h.seg ? [h.seg] : []);       // one bar or several
-      if(h.disabled || !segs.length) continue;
+      if(h.disabled || h.locked || !segs.length) continue;
       const d = Math.min(...segs.map(sg => segDist(px, py, sg)));
       if(d <= SEG()) found.push({ h, d });
     }
@@ -816,7 +960,7 @@ function startDrag(h, px, py){
 
 function doDrag(px, py){
   const h = TOOL.handles(S, api).find(q => q.id === drag.id);
-  if(!h || h.disabled) return;
+  if(!h || h.disabled || h.locked) return;
   h.drag(invX(px + drag.offX), invY(py + drag.offY), drag.start);
   if(TOOL.onEdit) TOOL.onEdit();
   render();
@@ -828,33 +972,130 @@ function cursorFor(cands){
   return cands[0].axis === 'x' ? 'ew-resize' : cands[0].axis === 'y' ? 'ns-resize' : 'grab';
 }
 
-// ── pointer handling: ONE pointer at a time ──
-// Only the primary pointer (mouse, pen, or the first finger on a touch board) is followed.
-// Extra fingers — e.g. a hand pointing at the board mid-drag — are ignored completely.
-// If a new press arrives while an old one still looks active (its release was lost),
-// the old interaction is dropped, so the page can never get stuck in a drag or pan.
-let activePointer = null;      // pointerId being followed, or null
+// ── pointer handling: one-pointer interactions + guarded two-finger pinch zoom ──
+// (tested on the classroom smartboards; open any explorer with ?debug=1, or press D, to see every touch)
+// Rules (each one is there to stop stray / phantom touches from doing anything lasting):
+//  • The page keeps its OWN list of pointers that are down; it never waits on the browser's.
+//  • When nothing is in progress, ANY new press starts a fresh drag / pan, even if the board
+//    still thinks some phantom finger is down.
+//  • While something is in progress, extra presses are ignored. A dot drag is never interrupted.
+//  • Pinch zoom starts only from a clean two-finger press: the 1st finger on empty space (a pan
+//    that has not really moved yet), the 2nd finger within PINCH_WINDOW ms and PINCH_MIN_GAP px away.
+//  • A pinch ends for good as soon as EITHER finger lifts; the other finger then does nothing
+//    until it lifts too (no surprise pan).
+//  • If the pointers driving the current interaction go silent for TAKEOVER_MS (their release
+//    was lost), the next press takes over.  A pinch silent for PINCH_TIMEOUT ms ends by itself.
+//  • A pen beats fingers: pen down cancels a finger gesture; fingers are ignored while a pen is active.
+const PINCH_WINDOW  = 350;    // ms between 1st and 2nd finger
+const PINCH_MIN_GAP = 40;     // CSS px between the two fingers
+const LEAD_STILL    = 12;     // CSS px the 1st finger may have moved before the 2nd lands
+const PINCH_DEADBAND = 10;    // CSS px of spread / midpoint motion before the view starts to change
+const TAKEOVER_MS   = 1500;   // silence after which a new press takes over
+const PINCH_TIMEOUT = 3000;   // silence after which a pinch ends by itself
+const PEN_RECENT    = 1500;   // a pen counts as "on the board" while it has sent events this recently
+
+let pinchEnabled = true;      // (can be set false from the console for comparison)
+const pointers = new Map();   // pointerId → { type, x, y, x0, y0, t0, t, w, h }
+let lead = null;              // pointerId driving drag / pending / pan
+let pinch = null;             // { a, b, d0, m0, v0, live }
+
+const now = () => performance.now();
+const viewNow = () => ({ xMin, xMax, yMin, yMax });
 
 function resetInteraction(){
-  drag = null; pending = null; panning = null; activePointer = null;
+  drag = null; pending = null; panning = null; pinch = null; lead = null;
 }
+const busyIds = () => pinch ? [pinch.a, pinch.b] : lead !== null ? [lead] : [];
+function silence(t){                                // ms since the busy pointers last did anything
+  const ts = busyIds().map(id => pointers.has(id) ? pointers.get(id).t : -Infinity);
+  return ts.length ? t - Math.max(...ts) : Infinity;
+}
+const penActive = t => [...pointers.values()].some(p => p.type === 'pen' && t - p.t < PEN_RECENT);
+function capture(id){ try { canvas.setPointerCapture(id); } catch(err){ /* optional */ } }
 
-canvas.addEventListener('pointerdown', e => {
-  if(!e.isPrimary) return;                                     // ignore extra fingers
-  if(e.pointerType === 'mouse' && e.button !== 0) return;
-  if(activePointer !== null) resetInteraction();               // a stale press: start fresh
-  activePointer = e.pointerId;
-  try { canvas.setPointerCapture(e.pointerId); } catch(err){ /* capture is optional */ }
-  const [px, py] = getPos(e);
+// a single-pointer interaction (as in the other explorers)
+function beginSingle(e, px, py){
+  lead = e.pointerId;
+  capture(e.pointerId);
   const c = candidates(px, py);
   if(c.length === 1)      startDrag(c[0], px, py);
   else if(c.length > 1){  pending = { cands: c, px, py }; activeIds = new Set(c.map(h => h.id)); draw(ctx); }
-  else { panning = { mx: invX(px), my: invY(py) }; canvas.style.cursor = 'move'; }
+  else { panning = { mx: invX(px), my: invY(py), v0: viewNow() }; canvas.style.cursor = 'move'; }
+}
+
+// second finger: turn a fresh, unmoved one-finger pan into a pinch
+function tryPinch(id, t){
+  if(!pinchEnabled || !panning || pinch) return 'ignored';
+  const A = pointers.get(lead), B = pointers.get(id);
+  if(!A || A.type !== 'touch' || B.type !== 'touch') return 'ignored (not two fingers)';
+  if(t - A.t0 > PINCH_WINDOW)                         return 'ignored (too late for pinch)';
+  if(Math.hypot(A.x - A.x0, A.y - A.y0) > LEAD_STILL) return 'ignored (1st finger already panning)';
+  if(Math.hypot(A.x - B.x, A.y - B.y) < PINCH_MIN_GAP) return 'ignored (fingers too close)';
+  ({ xMin, xMax, yMin, yMax } = panning.v0);           // undo the tiny pan so far
+  pinch = { a: lead, b: id, live: false };
+  rebasePinch();
+  panning = null; lead = null;
+  capture(id);
+  draw(ctx);
+  return 'PINCH started';
+}
+function pinchGeom(){
+  const A = pointers.get(pinch.a), B = pointers.get(pinch.b);
+  return { d: Math.max(10, Math.hypot(A.x - B.x, A.y - B.y)), m: [(A.x + B.x) / 2, (A.y + B.y) / 2] };
+}
+function rebasePinch(){ const { d, m } = pinchGeom(); pinch.d0 = d; pinch.m0 = m; pinch.v0 = viewNow(); }
+function pinchMove(){
+  const { d, m } = pinchGeom();
+  if(!pinch.live){
+    if(Math.abs(d - pinch.d0) < PINCH_DEADBAND && Math.hypot(m[0] - pinch.m0[0], m[1] - pinch.m0[1]) < PINCH_DEADBAND) return;
+    pinch.live = true; rebasePinch(); return;          // start from here: no jump
+  }
+  const s = clamp(pinch.d0 / d, 1e-3, 1e3);            // fingers apart → s < 1 → zoom in
+  const v = pinch.v0, spX = v.xMax - v.xMin, spY = v.yMax - v.yMin;
+  const nX = clamp(spX * (zoomAxis !== 'y' ? s : 1), SPAN_MIN, SPAN_MAX);
+  const nY = clamp(spY * (zoomAxis !== 'x' ? s : 1), SPAN_MIN, SPAN_MAX);
+  // the point that was under the starting midpoint stays under the current midpoint
+  const mx = v.xMin + pinch.m0[0] / W * spX, my = v.yMax - pinch.m0[1] / H * spY;
+  xMin = mx - m[0] / W * nX; xMax = xMin + nX;
+  yMax = my + m[1] / H * nY; yMin = yMax - nY;
+  clampView();
+  draw(ctx);
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if(e.pointerType === 'mouse' && e.button !== 0) return;
+  const [px, py] = getPos(e), t = now();
+  // the browser says no other pointer of this type is down: forget any we still remember
+  if(e.isPrimary && e.pointerType !== 'mouse')
+    for(const [id, p] of pointers) if(p.type === e.pointerType && id !== e.pointerId) pointers.delete(id);
+  pointers.set(e.pointerId, { type: e.pointerType, x: px, y: py, x0: px, y0: py, t0: t, t,
+                              w: Math.round(e.width || 0), h: Math.round(e.height || 0) });
+  let note;
+  if(busyIds().length){
+    const leadP = lead !== null ? pointers.get(lead) : null;
+    if(e.pointerType === 'pen' && !(leadP && leadP.type === 'pen')){ resetInteraction(); note = 'pen takes over'; }
+    else if(silence(t) > TAKEOVER_MS){ resetInteraction(); note = 'takeover (old pointers silent)'; }
+    else { tLog(e, tryPinch(e.pointerId, t)); return; }
+  }
+  if(e.pointerType === 'touch' && penActive(t)){ tLog(e, 'ignored (pen active)'); return; }
+  beginSingle(e, px, py);
+  tLog(e, (note ? note + ' → ' : '') + (drag ? 'drag ' + drag.id : pending ? 'pending' : 'pan'));
 });
 
 canvas.addEventListener('pointermove', e => {
-  if(activePointer !== null && e.pointerId !== activePointer) return;   // not the pointer we follow
+  const p = pointers.get(e.pointerId);
   const [px, py] = getPos(e);
+  if(!p){                                             // a hovering mouse / pen
+    if(!busyIds().length && e.pointerType !== 'touch') hover(px, py);
+    return;
+  }
+  p.x = px; p.y = py; p.t = now();
+  if(pinch){
+    if(e.pointerId === pinch.a || e.pointerId === pinch.b) pinchMove();
+    else if(DEBUG) draw(ctx);
+    return;
+  }
+  if(e.pointerId !== lead){ if(DEBUG) draw(ctx); return; }   // extra finger: ignored
   if(pending){
     const dx = px - pending.px, dy = py - pending.py;
     if(Math.hypot(dx, dy) < DIR_THRESH) return;
@@ -868,9 +1109,7 @@ canvas.addEventListener('pointermove', e => {
     xMin += dx; xMax += dx; yMin += dy; yMax += dy;
     clampView();
     draw(ctx);
-    return;
   }
-  if(activePointer === null) hover(px, py);
 });
 
 function hover(px, py){
@@ -880,20 +1119,92 @@ function hover(px, py){
   if([...ids].join() !== [...activeIds].join()){ activeIds = ids; draw(ctx); }
 }
 
-function endInteraction(e){
-  if(e.pointerId !== activePointer) return;                    // release of an ignored finger
+function endPointer(e){
+  const known = pointers.delete(e.pointerId);
+  const involved = e.pointerId === lead || (pinch && (e.pointerId === pinch.a || e.pointerId === pinch.b));
+  if(known || involved) tLog(e, involved ? 'ends ' + (pinch ? 'pinch' : 'interaction') : '');
+  if(!involved){ if(DEBUG) draw(ctx); return; }
   resetInteraction();
   if(e.pointerType === 'mouse' && e.type === 'pointerup'){ const [px, py] = getPos(e); hover(px, py); }
   else { canvas.style.cursor = 'default'; activeIds = new Set(); draw(ctx); }
 }
-canvas.addEventListener('pointerup', endInteraction);
-canvas.addEventListener('pointercancel', endInteraction);
-canvas.addEventListener('lostpointercapture', endInteraction);
-// leaving the page (switching windows, etc.) also ends any interaction
-window.addEventListener('blur', () => { if(activePointer !== null){ resetInteraction(); activeIds = new Set(); draw(ctx); } });
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('lostpointercapture', endPointer);
+
+function resetAll(why){
+  if(!pointers.size && !busyIds().length) return;
+  pointers.clear(); resetInteraction(); activeIds = new Set();
+  tLog(null, 'reset: ' + why);
+  draw(ctx);
+}
+// leaving the page (switching windows, etc.) ends everything
+window.addEventListener('blur', () => resetAll('window lost focus'));
+document.addEventListener('visibilitychange', () => { if(document.hidden) resetAll('page hidden'); });
 canvas.addEventListener('pointerleave', () => {
-  if(activePointer === null && activeIds.size){ activeIds = new Set(); draw(ctx); }
+  if(!busyIds().length && activeIds.size){ activeIds = new Set(); draw(ctx); }
 });
+// watchdog: a pinch whose fingers have gone silent ends by itself
+setInterval(() => {
+  if(pinch && silence(now()) > PINCH_TIMEOUT){
+    tLog(null, 'pinch timed out');
+    pointers.delete(pinch.a); pointers.delete(pinch.b);
+    resetInteraction(); draw(ctx);
+  }
+}, 500);
+
+// ── touch debugging: open the page with ?debug=1 (or press D) ──
+let DEBUG = new URLSearchParams(location.search).get('debug') === '1';
+const tLines = [];
+function tLog(e, note){
+  if(!DEBUG) return;
+  const t = (now() / 1000).toFixed(2);
+  const who = e ? `${e.type.replace('pointer', '').padEnd(8)} ${e.pointerType.padEnd(5)} id=${e.pointerId}${e.isPrimary ? '*' : ' '} ` +
+                  `${Math.round(e.width || 0)}×${Math.round(e.height || 0)}` : '';
+  tLines.unshift(`${t}  ${who}  ${note || ''}`);
+  tLines.length = Math.min(tLines.length, 14);
+  const el = document.getElementById('touch-log');
+  el.style.display = 'block';
+  el.textContent = 'touch log  (* = browser says primary;  w×h = contact size)\n' + tLines.join('\n');
+}
+document.addEventListener('keydown', e => {
+  if((e.key === 'd' || e.key === 'D') && !e.ctrlKey && !e.metaKey && !e.altKey){
+    DEBUG = !DEBUG;
+    document.getElementById('touch-log').style.display = DEBUG ? 'block' : 'none';
+    draw(ctx);
+  }
+});
+// drawn on the live canvas only (never in exported PNGs)
+function drawTouchOverlay(g){
+  const C = getColors();
+  if(pinch){
+    g.save();
+    g.font = '600 13px system-ui, sans-serif';
+    const txt = 'pinch zoom', w = g.measureText(txt).width + 16;
+    g.fillStyle = C.dark ? 'rgba(127,184,224,0.9)' : 'rgba(23,78,115,0.85)';
+    g.beginPath(); g.roundRect(W - w - 8, 8, w, 24, 6); g.fill();
+    g.fillStyle = C.dark ? '#111' : '#fff'; g.textBaseline = 'middle';
+    g.fillText(txt, W - w, 20);
+    g.restore();
+  }
+  if(!DEBUG) return;
+  g.save();
+  for(const [id, p] of pointers){
+    const role = id === lead ? 'lead' : pinch && (id === pinch.a || id === pinch.b) ? 'pinch' : 'ignored';
+    g.strokeStyle = role === 'ignored' ? 'rgba(150,150,150,0.9)' : p.type === 'pen' ? '#2E9E4F' : '#E07B00';
+    g.setLineDash(role === 'ignored' ? [4, 4] : []);
+    g.lineWidth = 2.5;
+    g.beginPath(); g.arc(p.x, p.y, 22, 0, 2 * Math.PI); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = g.strokeStyle; g.font = '600 12px system-ui, sans-serif'; g.textAlign = 'left';
+    g.fillText(`${p.type} ${id} · ${role}`, p.x + 26, p.y - 4);
+  }
+  const state = pinch ? (pinch.live ? 'pinch (zooming)' : 'pinch (waiting)') : drag ? 'drag' : pending ? 'pending' : panning ? 'pan' : 'idle';
+  g.font = '600 12px ui-monospace, monospace'; g.textAlign = 'left';
+  g.fillStyle = C.dark ? '#eee' : '#111';
+  g.fillText(`state: ${state}   pointers down: ${pointers.size}`, 56, H - 10);
+  g.restore();
+}
 
 // keep the view inside the zoom limits and away from huge coordinates
 function clampView(){
@@ -1041,6 +1352,121 @@ if(TOOL.roundToInt){
 }
 
 // ═════════════════════════════════════════════════════════════════
+//  ANIMATION MODE — draw the graph from right to left
+//  The pen moves at a constant on-screen speed (arc length in CSS px per second).  Heights are
+//  clamped just outside the window, so the pen does not crawl up a branch heading to ±∞: once
+//  the curve leaves the window it moves straight on.  At a vertical asymptote the pen stops just
+//  to its right, then jumps to just left of it.
+//  ▸ play  (◀): draw to the left edge, pausing briefly at each root / asymptote
+//  ▸ step (|◀): draw to the next root / asymptote and stop there
+// ═════════════════════════════════════════════════════════════════
+const ANIM_SPEED       = 260;   // CSS px of curve per second
+const ANIM_DWELL       = 450;   // ms pause at each root / asymptote during continuous play
+const ANIM_NEAR_BEFORE = 70;    // CSS px: a root / asymptote is highlighted from this far ahead of the pen…
+const ANIM_NEAR_AFTER  = 25;    // …until the pen is this far past it
+const ANIM_PAD         = 40;    // CSS px above / below the window counted as curve length
+
+const ANIM = { on: false, x: 0, play: null, dwellUntil: 0, last: 0, raf: 0, hotKey: '', stoppedAt: null };
+
+// move the pen left by `budget` px of curve; returns 'end', a feature x it stopped at, or null
+function animAdvance(budget){
+  const poles = TOOL.analyze(S).asymps, feats = TOOL.features(S);
+  const span = xMax - xMin, gap = span * 1e-7, dx = 0.5 * span / W;
+  const isPole = v => poles.some(p => Math.abs(p - v) < 1e-9);
+  const pyAt = x => { const y = TOOL.f(S, x); return isFinite(y) ? clamp(Y(y), -ANIM_PAD, H + ANIM_PAD) : null; };
+  let x = ANIM.x, py = pyAt(x);
+  for(let guard = 0; budget > 0 && guard < 20000; guard++){
+    if(x <= xMin){ ANIM.x = xMin; return 'end'; }
+    let nx = Math.max(x - dx, xMin);
+    // the next root / asymptote to the left: stop on it (just right of it for a pole).
+    // "Next" includes one the pen is exactly on, unless the pen already stopped there.
+    const next = feats.find(v => v <= x + 2 * gap && !(ANIM.stoppedAt !== null && Math.abs(v - ANIM.stoppedAt) < 1e-9));
+    let stop = null;
+    if(next !== undefined && next >= nx){ nx = isPole(next) ? next + gap : next; stop = next; }
+    // leaving a stop just right of a pole: jump across it (no length)
+    const across = poles.find(p => p < x && p > nx);
+    if(across !== undefined){ x = across - gap; py = pyAt(x); continue; }
+    const npy = pyAt(nx), run = (x - nx) / span * W;
+    budget -= (npy !== null && py !== null) ? Math.hypot(run, npy - py) : run;
+    x = nx; if(npy !== null) py = npy;
+    if(stop !== null){ ANIM.x = x; ANIM.stoppedAt = stop; return stop; }
+  }
+  ANIM.x = x;
+  return x <= xMin ? 'end' : null;
+}
+
+// redraw while animating; the formula only when the highlighted factors change
+function animRefresh(){
+  draw(ctx);
+  const key = TOOL.hotX(S, api).join(',');
+  if(key !== ANIM.hotKey){ ANIM.hotKey = key; updateFormula(); }
+  animButtons();
+}
+
+function animFrame(t){
+  if(!ANIM.play){ ANIM.raf = 0; return; }
+  const dt = Math.min(50, t - (ANIM.last || t)); ANIM.last = t;
+  if(t >= ANIM.dwellUntil){
+    const r = animAdvance(ANIM_SPEED * dt / 1000);
+    if(r === 'end') ANIM.play = null;
+    else if(r !== null){                                   // reached a root / asymptote
+      if(ANIM.play === 'step') ANIM.play = null;
+      else ANIM.dwellUntil = t + ANIM_DWELL;
+    }
+    animRefresh();
+  }
+  ANIM.raf = ANIM.play ? requestAnimationFrame(animFrame) : 0;
+}
+
+function animStart(kind){
+  if(!ANIM.on) return;
+  if(ANIM.x <= xMin + (xMax - xMin) * 1e-6 || ANIM.x > xMax){   // finished, or drawn part off to the right:
+    ANIM.x = xMax; ANIM.stoppedAt = null;                         // start over
+  }
+  ANIM.play = kind; ANIM.dwellUntil = 0; ANIM.last = 0;
+  if(!ANIM.raf) ANIM.raf = requestAnimationFrame(animFrame);
+  animButtons();
+}
+function animPause(){ ANIM.play = null; animButtons(); }
+function animRestart(){ ANIM.play = null; ANIM.x = xMax; ANIM.stoppedAt = null; animRefresh(); }
+function animToggle(){
+  ANIM.on = !ANIM.on;
+  ANIM.play = null; ANIM.x = xMax; ANIM.hotKey = ''; ANIM.stoppedAt = null;
+  const sw = document.getElementById('anim-lock');
+  sw.classList.toggle('on', ANIM.on); sw.setAttribute('aria-checked', String(ANIM.on));
+  document.getElementById('anim-row').classList.toggle('on', ANIM.on);
+  render(); animButtons();
+}
+
+const ICON_PLAY  = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><polygon points="2.5,8 13.5,1.5 13.5,14.5" fill="currentColor"/></svg>';
+const ICON_PAUSE = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.4" height="12" rx="0.8" fill="currentColor"/><rect x="9.6" y="2" width="3.4" height="12" rx="0.8" fill="currentColor"/></svg>';
+function animButtons(){
+  const play = document.getElementById('anim-play'), step = document.getElementById('anim-step');
+  const running = ANIM.play === 'run';
+  if(play.dataset.state !== String(running)){ play.innerHTML = running ? ICON_PAUSE : ICON_PLAY; play.dataset.state = String(running); }
+  play.classList.toggle('playing', running);
+  play.title = running ? 'Pause (Space)' : 'Draw to the left edge (Space)';
+  step.classList.toggle('playing', ANIM.play === 'step');
+}
+
+document.getElementById('anim-lock').addEventListener('click', animToggle);
+document.getElementById('anim-lock').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); animToggle(); }
+});
+document.getElementById('anim-play').addEventListener('click', () => ANIM.play === 'run' ? animPause() : animStart('run'));
+document.getElementById('anim-step').addEventListener('click', () => animStart('step'));
+document.getElementById('anim-restart').addEventListener('click', animRestart);
+// keyboard (also works with presentation clickers that send PageDown)
+document.addEventListener('keydown', e => {
+  if(!ANIM.on || e.ctrlKey || e.metaKey || e.altKey) return;
+  if(e.target.closest && e.target.closest('input, textarea')) return;
+  if(e.key === ' '){ e.preventDefault(); ANIM.play === 'run' ? animPause() : animStart('run'); }
+  else if(e.key === 'n' || e.key === 'N' || e.key === 'ArrowLeft' || e.key === 'PageDown'){ e.preventDefault(); animStart('step'); }
+  else if(e.key === 'r' || e.key === 'R' || e.key === 'Home'){ e.preventDefault(); animRestart(); }
+});
+animButtons();
+
+// ═════════════════════════════════════════════════════════════════
 //  RATIONAL TOOL — PAGE CONTROLS  (scale slider, right-click menu)
 // ═════════════════════════════════════════════════════════════════
 document.getElementById('scale-slider').addEventListener('input', e => {
@@ -1067,6 +1493,7 @@ function showMenu(cx, cy){
 canvas.addEventListener('contextmenu', e => {
   e.preventDefault();
   resetInteraction();                              // a long-press may have started a pan
+  if(ANIM.on){ hideMenu(); return; }               // roots / asymptotes are locked while animating
   const [px, py] = getPos(e);
   if(Math.abs(py - Y(0)) > 18){ hideMenu(); return; }
   const nearest = list => {                        // index of the closest dot within reach, or −1
@@ -1114,6 +1541,7 @@ window.addEventListener('blur', hideMenu);
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
 window.addEventListener('resize', () => { hideMenu(); setCanvasSize(); render(); });
 loadFromURL();
+if(!new URLSearchParams(location.search).has('v')) resetView();   // fit the window to the loaded graph
 applyIntLock();
 document.title = TOOL.title;
 setCanvasSize();

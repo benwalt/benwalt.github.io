@@ -111,6 +111,9 @@ input[type=range]::-moz-range-thumb {
   cursor: pointer;
 }
 
+/* the n slider sits in a column: don't let the row rule (flex: 1) stretch it tall */
+#sl-n { flex: none; }
+
 #n-stops {
   display: flex;
   justify-content: space-between;
@@ -223,7 +226,7 @@ input[type=range]::-moz-range-thumb {
   <div id="tooltip" style="position:absolute;display:none;pointer-events:none;background:rgba(255,255,255,0.95);border:0.5px solid rgba(0,0,0,0.18);border-radius:7px;padding:5px 10px;font-size:13px;color:#111;white-space:nowrap;"></div>
 </div>
 
-<div id="hint">Scroll to zoom &nbsp;·&nbsp; Double-click to reset view</div>
+<div id="hint">Hover, or hold a finger or pen on the graph, to read the balance &nbsp;·&nbsp; Scroll or pinch to zoom the time axis &nbsp;·&nbsp; Double-click to reset view</div>
 
 <script>
 const A0 = 100;
@@ -246,13 +249,19 @@ const DEFAULT_XMAX = 10;
 const canvas = document.getElementById('plot');
 const ctx    = canvas.getContext('2d');
 
+// sharp on hi-DPI screens: drawing is done in CSS px (CW × CH)
+let CW = 0, CH = 0;
 function setCanvasSize() {
-  const W = document.getElementById('canvas-wrap').clientWidth;
-  canvas.width  = W;
-  canvas.height = Math.round(W * 0.62);
+  CW = document.getElementById('canvas-wrap').clientWidth;
+  CH = Math.round(CW * 0.62);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.round(CW * dpr);
+  canvas.height = Math.round(CH * dpr);
+  canvas.style.height = CH + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
-function plotW() { return canvas.width  - MARGIN_LEFT - MARGIN_RIGHT; }
-function plotH() { return canvas.height - MARGIN_TOP  - MARGIN_BOTTOM; }
+function plotW() { return CW - MARGIN_LEFT - MARGIN_RIGHT; }
+function plotH() { return CH - MARGIN_TOP  - MARGIN_BOTTOM; }
 
 function yMaxContinuous() {
   return Math.max(A0 * Math.exp(r * xMax) * 1.12, 200);
@@ -292,7 +301,7 @@ function fmtTick(v) {
 let hoverT = null; // current mouse t value, or null if outside plot
 
 function draw() {
-  const W = canvas.width, H = canvas.height;
+  const W = CW, H = CH;
   const C = getColors();
   const PW = plotW(), PH = plotH();
   const yMax = yMaxContinuous();
@@ -414,52 +423,132 @@ function updateKatex() {
   rk(document.getElementById('leg-continuous'), `100\\,e^{${rVal}\\,t}`, false);
 }
 
-/* ── hover tooltip ── */
+/* ── readout: "$100 → $… after … years" at the pointer's time ──
+   Shown while a mouse hovers, and while a finger or pen is held on the graph
+   (smartboards cannot hover), placed higher for touch so the hand does not cover it. */
 const tooltip = document.getElementById('tooltip');
 
-function updateTooltip(e) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const cx = (e.clientX - rect.left) * scaleX;
-  const PW = plotW(), PH = plotH();
-
-  if (cx < MARGIN_LEFT || cx > MARGIN_LEFT + PW) {
-    hoverT = null;
-    tooltip.style.display = 'none';
-    draw();
-    return;
-  }
-
-  hoverT = ((cx - MARGIN_LEFT) / PW) * xMax;
+function showReadout(px, clientX, clientY, kind) {
+  const PW = plotW();
+  if (px < MARGIN_LEFT || px > MARGIN_LEFT + PW) { hideReadout(); return; }
+  hoverT = ((px - MARGIN_LEFT) / PW) * xMax;
   const hY = A0 * Math.pow(1 + r / n, Math.floor(hoverT * n));
+  tooltip.textContent = `$${fmt(A0)} → $${hY.toFixed(2)} after ${hoverT.toFixed(2)} years`;
 
-  const yearsStr = hoverT.toFixed(2);
-  const valStr   = hY.toFixed(2);
-  tooltip.textContent = `$${fmt(A0)} → $${valStr} after ${yearsStr} years`;
-
-  /* position tooltip: above-right of cursor, flipping left if near right edge */
-  const canvasRect = canvas.parentElement.getBoundingClientRect();
-  const tipX = e.clientX - canvasRect.left + 14;
-  const tipY = e.clientY - canvasRect.top  - 36;
+  const wrap = canvas.parentElement.getBoundingClientRect();
+  const lift = kind === 'mouse' ? 36 : 84;
+  let tipX = clientX - wrap.left + 14;
+  const tipY = Math.max(0, clientY - wrap.top - lift);
   tooltip.style.display = 'block';
-  tooltip.style.left = tipX + 'px';
-  tooltip.style.top  = tipY + 'px';
-
-  /* flip left if overflowing */
   const tipW = tooltip.offsetWidth;
-  if (tipX + tipW > canvasRect.width - 4) {
-    tooltip.style.left = (tipX - tipW - 28) + 'px';
-  }
-
+  if (tipX + tipW > wrap.width - 4) tipX = clientX - wrap.left - tipW - 14;    // flip left near the edge
+  tooltip.style.left = Math.max(0, tipX) + 'px';
+  tooltip.style.top  = tipY + 'px';
   draw();
 }
-
-canvas.addEventListener('mousemove', updateTooltip);
-canvas.addEventListener('mouseleave', () => {
+function hideReadout() {
+  if (hoverT === null && tooltip.style.display === 'none') return;
   hoverT = null;
   tooltip.style.display = 'none';
   draw();
+}
+
+/* ── pointer handling (same safeguards as the other explorers' graphing core) ──
+   • the page keeps its own list of pointers that are down; when nothing is in progress any new
+     press starts fresh, even if the board still thinks a phantom finger is down
+   • two-finger pinch (zooms the time axis) only from a clean start: 2nd finger within
+     PINCH_WINDOW ms of the 1st, PINCH_MIN_GAP px away, before the 1st has moved
+   • a pinch ends for good when either finger lifts; pointers silent for TAKEOVER_MS give way to
+     a new press; a silent pinch times out; a pen beats fingers */
+const PINCH_WINDOW = 350, PINCH_MIN_GAP = 40, LEAD_STILL = 12, PINCH_DEADBAND = 10;
+const TAKEOVER_MS = 1500, PINCH_TIMEOUT = 3000, PEN_RECENT = 1500;
+const XMAX_MIN = 1, XMAX_MAX = 100;               // years shown
+const pointers = new Map();   // pointerId → { type, x, y, x0, y0, t0, t }
+let lead = null, pinch = null;
+const now = () => performance.now();
+const ptPos = e => { const rc = canvas.getBoundingClientRect(); return [e.clientX - rc.left, e.clientY - rc.top]; };
+const busyIds = () => pinch ? [pinch.a, pinch.b] : lead !== null ? [lead] : [];
+function silence(t) {
+  const ts = busyIds().map(id => pointers.has(id) ? pointers.get(id).t : -Infinity);
+  return ts.length ? t - Math.max(...ts) : Infinity;
+}
+const penActive = t => [...pointers.values()].some(p => p.type === 'pen' && t - p.t < PEN_RECENT);
+function capture(id) { try { canvas.setPointerCapture(id); } catch (err) { /* optional */ } }
+function resetInteraction() { lead = null; pinch = null; }
+
+function tryPinch(id, t) {
+  if (pinch || lead === null) return;
+  const A = pointers.get(lead), B = pointers.get(id);
+  if (!A || A.type !== 'touch' || B.type !== 'touch') return;
+  if (t - A.t0 > PINCH_WINDOW || Math.hypot(A.x - A.x0, A.y - A.y0) > LEAD_STILL) return;
+  if (Math.hypot(A.x - B.x, A.y - B.y) < PINCH_MIN_GAP) return;
+  pinch = { a: lead, b: id, live: false };
+  rebasePinch();
+  lead = null;
+  capture(id);
+  hideReadout();
+}
+function pinchDist() {
+  const A = pointers.get(pinch.a), B = pointers.get(pinch.b);
+  return Math.max(10, Math.hypot(A.x - B.x, A.y - B.y));
+}
+function rebasePinch() { pinch.d0 = pinchDist(); pinch.x0 = xMax; }
+function pinchMove() {
+  const d = pinchDist();
+  if (!pinch.live) {
+    if (Math.abs(d - pinch.d0) < PINCH_DEADBAND) return;
+    pinch.live = true; rebasePinch(); return;
+  }
+  xMax = Math.min(XMAX_MAX, Math.max(XMAX_MIN, pinch.x0 * pinch.d0 / d));   // fingers apart → fewer years
+  updateKatex(); draw();
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  const [px, py] = ptPos(e), t = now();
+  if (e.isPrimary && e.pointerType !== 'mouse')
+    for (const [id, p] of pointers) if (p.type === e.pointerType && id !== e.pointerId) pointers.delete(id);
+  pointers.set(e.pointerId, { type: e.pointerType, x: px, y: py, x0: px, y0: py, t0: t, t });
+  if (busyIds().length) {
+    const leadP = lead !== null ? pointers.get(lead) : null;
+    if (e.pointerType === 'pen' && !(leadP && leadP.type === 'pen')) resetInteraction();
+    else if (silence(t) > TAKEOVER_MS) resetInteraction();
+    else { tryPinch(e.pointerId, t); return; }
+  }
+  if (e.pointerType === 'touch' && penActive(t)) return;
+  lead = e.pointerId;
+  capture(e.pointerId);
+  showReadout(px, e.clientX, e.clientY, e.pointerType);
 });
+
+canvas.addEventListener('pointermove', e => {
+  const p = pointers.get(e.pointerId);
+  const [px, py] = ptPos(e);
+  if (!p) {                                          // a hovering mouse / pen
+    if (!busyIds().length && e.pointerType !== 'touch') showReadout(px, e.clientX, e.clientY, 'mouse');
+    return;
+  }
+  p.x = px; p.y = py; p.t = now();
+  if (pinch) { if (e.pointerId === pinch.a || e.pointerId === pinch.b) pinchMove(); return; }
+  if (e.pointerId === lead) showReadout(px, e.clientX, e.clientY, e.pointerType);
+});
+
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  const involved = e.pointerId === lead || (pinch && (e.pointerId === pinch.a || e.pointerId === pinch.b));
+  if (!involved) return;
+  resetInteraction();
+  if (e.pointerType !== 'mouse') hideReadout();
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('lostpointercapture', endPointer);
+canvas.addEventListener('pointerleave', e => { if (!busyIds().length) hideReadout(); });
+window.addEventListener('blur', () => { pointers.clear(); resetInteraction(); hideReadout(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { pointers.clear(); resetInteraction(); hideReadout(); } });
+setInterval(() => {                                  // a pinch whose fingers went silent ends by itself
+  if (pinch && silence(now()) > PINCH_TIMEOUT) { pointers.delete(pinch.a); pointers.delete(pinch.b); resetInteraction(); }
+}, 500);
 
 document.getElementById('sl-r').addEventListener('input', e => {
   r = parseFloat(e.target.value) / 100;
@@ -473,8 +562,10 @@ document.getElementById('sl-n').addEventListener('input', e => {
 
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
-  const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
-  xMax = Math.max(1, xMax * factor);
+  // proportional to the scroll amount, so trackpads zoom smoothly
+  const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+  const factor = Math.min(2, Math.max(0.5, Math.exp(dy * 0.0015)));
+  xMax = Math.min(XMAX_MAX, Math.max(XMAX_MIN, xMax * factor));
   updateKatex(); draw();
 }, { passive: false });
 
