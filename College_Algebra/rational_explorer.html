@@ -3,16 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rational Function Root / Asymptote Explorer</title>
+<title>Rational Function Explorer</title>
 
-<script>
-MathJax = {
-  tex: { inlineMath: [['\\(','\\)']] },
-  options: { skipHtmlTags: ['script','noscript','style','textarea'] },
-  startup: { typeset: false }
-};
-</script>
-<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,7 +20,6 @@ body {
 }
 
 canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
-
 #canvas-wrap { position: relative; }
 
 /* ── zoom axis selector overlay ── */
@@ -60,25 +53,62 @@ canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
 #zoom-select button:hover  { background: rgba(255,255,255,0.75); }
 #zoom-select button.active { background: rgba(0,0,0,0.65); border-color: rgba(0,0,0,0.7); color: #fff; }
 
-@media (prefers-color-scheme: dark) {
-  #zoom-select .zoom-label { color: rgba(255,255,255,0.7); }
-  #zoom-select button {
-    border-color: rgba(255,255,255,0.35);
-    background: rgba(0,0,0,0.28);
-    color: rgba(255,255,255,0.85);
-  }
-  #zoom-select button:hover  { background: rgba(0,0,0,0.45); }
-  #zoom-select button.active { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.7); color: #fff; }
-}
-  
-/* ── scaling slider ── */
-#scale-row {
-  display: flex; align-items: center; gap: 12px;
+/* ── formula panel ── */
+#formula-display {
   margin-top: 0.85rem;
+  padding: 0.85rem 1.1rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+  border: 0.5px solid #ddd;
+  min-height: 6.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow-x: auto;
 }
-#scale-row label { font-size: 13px; color: #666; white-space: nowrap; }
-#scale-val { font-size: 13px; font-weight: 500; min-width: 3.5ch; text-align: right; }
+#formula-math { max-width: 100%; }
+#formula-display .katex { font-size: 1.35em; }
 
+/* ── action buttons (export / share) ── */
+#action-row { display: flex; gap: 8px; margin-top: 0.75rem; }
+#action-row button {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 13px;
+  font-size: 13px; font-weight: 500;
+  border-radius: 7px;
+  border: 0.5px solid #bbb;
+  background: transparent; color: #333;
+  cursor: pointer; transition: background 0.13s;
+}
+#action-row button:hover { background: #f0f0f0; }
+#action-row button.copied { background: #d4edda; border-color: #82c99a; color: #1a6b32; }
+
+#hint { margin-top: 0.6rem; font-size: 11px; color: #999; }
+
+/* ── integer-lock switch (shown only for tools that support it) ── */
+#int-lock {
+  margin-left: auto;
+  display: none; align-items: center; gap: 8px;
+  font-size: 13px; color: #555;
+  cursor: pointer; user-select: none;
+}
+#int-lock .track {
+  position: relative; width: 40px; height: 22px; border-radius: 11px;
+  background: #ccc; transition: background 0.2s; flex-shrink: 0;
+}
+#int-lock .thumb {
+  position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: left 0.2s;
+}
+#int-lock.on .track { background: #185FA5; }
+#int-lock.on .thumb { left: 20px; }
+#int-lock.on { color: #185FA5; font-weight: 600; }
+
+/* ── rational tool: scale slider, legend, right-click menu ── */
+#scale-row { display: flex; align-items: center; gap: 12px; margin-top: 0.85rem; }
+#scale-row label { font-size: 13px; color: #174E73; font-weight: 600; white-space: nowrap; }
+#scale-val { font-size: 13px; font-weight: 600; color: #174E73; min-width: 3.5ch; text-align: right; }
 #scale-slider {
   flex: 1;
   -webkit-appearance: none; appearance: none;
@@ -87,30 +117,21 @@ canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
 }
 #scale-slider::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
-  width: 14px; height: 14px; border-radius: 50%;
-  background: #185FA5; border: none; cursor: pointer;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #2A7AB0; border: 2px solid #174E73; cursor: pointer;
 }
 #scale-slider::-moz-range-thumb {
-  width: 14px; height: 14px; border-radius: 50%;
-  background: #185FA5; border: none; cursor: pointer;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #2A7AB0; border: 2px solid #174E73; cursor: pointer;
 }
 #scale-slider::-moz-range-progress { background: transparent; }
 
-/* ── legend ── */
-#legend {
-  display: flex; flex-direction: column; gap: 5px;
-  margin-top: 0.75rem;
-  font-size: 12px; color: #666;
-}
-#legend-dots { display: flex; gap: 18px; align-items: center; }
-#legend-hint { font-size: 11px; color: #999; }
-.legend-dot {
-  width: 12px; height: 12px; border-radius: 50%;
-  display: inline-block; flex-shrink: 0;
-}
+#legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 0.75rem; font-size: 12px; color: #666; }
 .legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; border: 2px solid; }
+.legend-dot.red    { background: #E8403E; border-color: #A32D2D; }
+.legend-dot.purple { background: #9B59B6; border-color: #6C3483; }
 
-/* ── context menu ── */
 #ctx-menu {
   position: fixed;
   background: #fff;
@@ -130,80 +151,36 @@ canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
   font-size: 13px; color: #111;
 }
 #ctx-menu button:hover { background: #f0f0f0; }
-#ctx-menu hr { border: none; border-top: 0.5px solid #e0e0e0; margin: 3px 0; }
-
-@media (prefers-color-scheme: dark) {
-  #ctx-menu { background: #2a2a2a; border-color: #444; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
-  #ctx-menu button { color: #eee; }
-  #ctx-menu button:hover { background: #383838; }
-  #ctx-menu hr { border-color: #444; }
-}
-
-/* ── action buttons ── */
-#action-row {
-  display: flex; gap: 10px;
-  margin-top: 0.85rem;
-}
-#action-row button {
-  flex: 1;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 0.5px solid #ccc;
-  background: #f5f5f5;
-  font-size: 13px; cursor: pointer;
-  transition: background 0.15s;
-}
-#action-row button:hover { background: #e8e8e8; }
-#action-row button.flash {
-  background: #d4edda; border-color: #98c9a3;
-}
-
-@media (prefers-color-scheme: dark) {
-  #action-row button { background: #2a2a2a; border-color: #444; color: #eee; }
-  #action-row button:hover { background: #333; }
-  #action-row button.flash { background: #1a3a2a; border-color: #3a6a4a; }
-}
-#poly-display {
-  margin-top: 0.85rem;
-  padding: 0.85rem 1.1rem;
-  background: #f5f5f5;
-  border-radius: 8px;
-  border: 0.5px solid #ddd;
-  min-height: 5rem;
-  display: flex;
-  align-items: center;
-}
-#poly-display mjx-container { font-size: 115% !important; }
-
-/* ── action buttons (export / share) ── */
-#action-row {
-  display: flex; gap: 8px; margin-top: 0.75rem;
-}
-#action-row button {
-  display: flex; align-items: center; gap: 6px;
-  padding: 6px 13px;
-  font-size: 13px; font-weight: 500;
-  border-radius: 7px;
-  border: 0.5px solid #bbb;
-  background: transparent; color: #333;
-  cursor: pointer; transition: background 0.13s;
-}
-#action-row button:hover { background: #f0f0f0; }
-#action-row button.copied { background: #d4edda; border-color: #82c99a; color: #1a6b32; }
-
-@media (prefers-color-scheme: dark) {
-  #action-row button { border-color: #555; color: #ccc; }
-  #action-row button:hover { background: #2a2a2a; }
-  #action-row button.copied { background: #1a3d25; border-color: #3a8a52; color: #7dcf97; }
-}
 
 @media (prefers-color-scheme: dark) {
   body { background: #1a1a1a; color: #eee; }
-  #degree-row span, #scale-row label, #legend, #legend-hint { color: #999; }
-  #poly-display { background: #242424; border-color: #333; color: #eee; }
+  #zoom-select .zoom-label { color: rgba(255,255,255,0.7); }
+  #zoom-select button {
+    border-color: rgba(255,255,255,0.35);
+    background: rgba(0,0,0,0.28);
+    color: rgba(255,255,255,0.85);
+  }
+  #zoom-select button:hover  { background: rgba(0,0,0,0.45); }
+  #zoom-select button.active { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.7); color: #fff; }
+  #formula-display { background: #242424; border-color: #333; color: #eee; }
+  #action-row button { border-color: #555; color: #ccc; }
+  #action-row button:hover { background: #2a2a2a; }
+  #action-row button.copied { background: #1a3d25; border-color: #3a8a52; color: #7dcf97; }
+  #hint { color: #777; }
+  #int-lock { color: #aaa; }
+  #int-lock .track { background: #444; }
+  #int-lock.on { color: #85B7EB; }
+
+  #scale-row label, #scale-val { color: #7FB8E0; }
   #scale-slider { background: #444; }
-  #scale-slider::-webkit-slider-thumb { background: #85B7EB; }
-  #scale-slider::-moz-range-thumb    { background: #85B7EB; }
+  #scale-slider::-webkit-slider-thumb { background: #7FB8E0; border-color: #3D8BC0; }
+  #scale-slider::-moz-range-thumb    { background: #7FB8E0; border-color: #3D8BC0; }
+  #legend { color: #999; }
+  .legend-dot.red    { background: #F09595; border-color: #E24B4A; }
+  .legend-dot.purple { background: #C9A0E8; border-color: #9B59B6; }
+  #ctx-menu { background: #2a2a2a; border-color: #444; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+  #ctx-menu button { color: #eee; }
+  #ctx-menu button:hover { background: #383838; }
 }
 </style>
 </head>
@@ -215,11 +192,9 @@ canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
     <div class="zoom-label">Zoom</div>
     <button id="zoom-xy" class="active" title="Scroll to zoom both axes">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <!-- left-right arrow -->
         <line x1="1" y1="8" x2="15" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         <polyline points="4,5 1,8 4,11" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
         <polyline points="12,5 15,8 12,11" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
-        <!-- up-down arrow -->
         <line x1="8" y1="1" x2="8" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         <polyline points="5,4 8,1 11,4" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
         <polyline points="5,12 8,15 11,12" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
@@ -237,915 +212,789 @@ canvas { display: block; width: 100%; touch-action: none; border-radius: 8px; }
 </div>
 
 <div id="legend">
-  <div id="legend-dots">
-    <div class="legend-item">
-      <span class="legend-dot" style="background:#E24B4A;border:1.5px solid #A32D2D;"></span>
-      <span>numerator roots (drag <em>to move</em>)</span>
-    </div>
-    <div class="legend-item">
-      <span class="legend-dot" style="background:#9B59B6;border:1.5px solid #6C3483;"></span>
-      <span>denominator roots / asymptotes (drag <em>to move</em>)</span>
-    </div>
-  </div>
-  <div id="legend-hint">Right-click the x-axis to add, remove, or duplicate roots / asymptotes</div>
+  <div class="legend-item"><span class="legend-dot red"></span><span>numerator roots</span></div>
+  <div class="legend-item"><span class="legend-dot purple"></span><span>denominator roots / vertical asymptotes</span></div>
 </div>
+
+<div id="formula-display"><span id="formula-math"></span></div>
+
+<div id="action-row">
+  <button id="btn-export">&#x2193; Export PNG</button>
+  <button id="btn-share">&#x1F517; Copy link</button>
+  <div id="int-lock" role="switch" aria-checked="false" tabindex="0" title="Lock all values to integers">
+    <span>Integers only</span>
+    <div class="track"><div class="thumb"></div></div>
+  </div>
+</div>
+
+<div id="hint">Drag the colored points (or a dashed asymptote) &nbsp;·&nbsp; Drag empty space to pan &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Double-click to reset view &nbsp;·&nbsp; Right-click the x-axis to add, remove, or duplicate roots / asymptotes</div>
 
 <div id="ctx-menu">
   <button id="ctx-add-root">Add root here</button>
   <button id="ctx-add-asymp">Add asymptote here</button>
-  <hr id="ctx-hr">
   <button id="ctx-dup-root">Duplicate root</button>
   <button id="ctx-rem-root">Remove root</button>
   <button id="ctx-dup-asymp">Duplicate asymptote</button>
   <button id="ctx-rem-asymp">Remove asymptote</button>
 </div>
 
-<div id="poly-display">
-  <div id="math-output"></div>
-</div>
-
-<div id="action-row">
-  <button id="btn-export">&#x2193; Export PNG</button>
-  <button id="btn-share">&#x1F517; Copy link</button>
-</div>
-
 <script>
-// ─────────────────────────────────────────────────────────────────
-//  CONFIG — tweak here when adding degree selection later
-// ─────────────────────────────────────────────────────────────────
-let xMin = -5, xMax = 5, yMin = -10, yMax = 10;
-const HOLE_THRESH = 0.05;   // distance within which roots are considered shared
+'use strict';
+// ═════════════════════════════════════════════════════════════════
+//  TOOL DEFINITION  (the only part that differs between explorers)
+// ═════════════════════════════════════════════════════════════════
+// Rational function in factored form
+//   f(x) = a · (x − r₁)(x − r₂)… / (x − s₁)(x − s₂)…
+// Handles:  red    numerator roots r      x only (on the x-axis)
+//           purple denominator roots s   x only; the dashed vertical line also grabs it
+//           a      the scale slider under the graph
+// A denominator root is a HOLE when the numerator has that root at least as many times,
+// otherwise a vertical ASYMPTOTE.  Roots count as equal only when exactly equal; a dragged
+// dot is pulled onto a nearby dot (MAGNET px) so equal roots are easy to make at any zoom.
+// The horizontal (deg num < deg den: y = 0;  equal: y = a) or slant (one more: a line)
+// asymptote is drawn dashed in amber when the graph has a vertical asymptote.
 
-let numRoots = [-1.5, 1.5];   // numerator roots
-let denRoots = [-0.5, 2.5];   // denominator roots (asymptotes)
-let scale = 1;
+const RATIONAL = (() => {
+  const same  = (u, v) => Math.abs(u - v) < 1e-9;
+  const count = (list, x) => list.filter(r => same(r, x)).length;
+  const MAGNET = 8;                                // CSS px
 
-let dragging = null;   // { kind: 'num'|'den', idx, offsetX }
-let panning  = null;   // { mx, my } — math-space anchor on mousedown
-let mathJaxReady = false;
+  const f = (S, x) => {
+    let y = S.a;
+    for(const r of S.num) y *= (x - r);
+    for(const s of S.den) y /= (x - s);
+    return y;
+  };
 
-// ─────────────────────────────────────────────────────────────────
-//  CANVAS SETUP
-// ─────────────────────────────────────────────────────────────────
+  // holes, asymptotes and the reduced function (all common factors cancelled)
+  function analyze(S){
+    const num = [...S.num], den = [...S.den];
+    const holes = [], asymps = [];
+    for(const x of [...new Set(S.den)]){
+      if(asymps.some(v => same(v, x)) || holes.some(h => same(h.x, x))) continue;
+      const cn = count(S.num, x), cd = count(S.den, x);
+      if(cn >= cd) holes.push({ x }); else asymps.push(x);
+      for(let c = Math.min(cn, cd); c > 0; c--){          // cancel min(cn, cd) copies
+        num.splice(num.findIndex(r => same(r, x)), 1);
+        den.splice(den.findIndex(r => same(r, x)), 1);
+      }
+    }
+    const reduced = x => f({ a: S.a, num, den }, x);
+    for(const h of holes) h.y = reduced(h.x);
+    return { holes, asymps, degDiff: S.num.length - S.den.length };
+  }
+
+  // ── text helpers ──
+  const MINUS = '−';
+  const fmtU  = v => String(parseFloat(v.toFixed(4)));
+  const plain = v => v < 0 ? MINUS + fmtU(-v) : fmtU(v);
+
+  // ── tooltip box drawn on the canvas ──
+  function label(g, lines, ax, ay, side, color, C, api, gap = 12){
+    g.save();
+    g.font = '600 14px system-ui, sans-serif';
+    const padX = 7, padY = 5, lh = 18;
+    const w = Math.max(...lines.map(t => g.measureText(t).width)) + 2 * padX;
+    const h = lines.length * lh + 2 * padY - 4;
+    let x = ax - w / 2;
+    let y = side === 'below' ? ay + gap : ay - gap - h;
+    x = api.clamp(x, 2, api.W - w - 2);
+    y = api.clamp(y, 2, api.H - h - 2);
+    g.fillStyle = C.dark ? 'rgba(36,36,36,0.85)' : 'rgba(255,255,255,0.85)';
+    g.strokeStyle = color[1]; g.lineWidth = 1.5;
+    g.beginPath(); g.roundRect(x, y, w, h, 6); g.fill(); g.stroke();
+    g.fillStyle = C.dark ? color[0] : color[1];
+    g.textBaseline = 'top'; g.textAlign = 'left';
+    lines.forEach((t, i) => g.fillText(t, x + padX, y + padY + i * lh));
+    g.restore();
+  }
+
+  // ── exact expansion of ∏(x − r) (roots are terminating decimals) ──
+  const decimals = v => { const s = String(parseFloat(v.toFixed(6))); const i = s.indexOf('.'); return i < 0 ? 0 : s.length - i - 1; };
+  // v / 10^e as a decimal: exact when it has ≤ 4 decimals, otherwise rounded to 4
+  function decimalOf(v, e){
+    const neg = v < 0n;
+    let m = neg ? -v : v, exact = true;
+    if(e > 4){
+      const div = 10n ** BigInt(e - 4), r = m % div;
+      if(r !== 0n) exact = false;
+      m = m / div + (2n * r >= div ? 1n : 0n);
+      e = 4;
+    }
+    const P = 10n ** BigInt(e);
+    const fp = (m % P).toString().padStart(e, '0').replace(/0+$/, '');
+    const tex = fp ? `${m / P}.${fp}` : `${m / P}`;
+    return { tex, zero: m === 0n, neg: neg && m !== 0n, one: tex === '1', exact };
+  }
+  function expand(roots){                            // coefficients, highest power first
+    const d = Math.max(0, ...roots.map(decimals));
+    const s = 10n ** BigInt(d);
+    let c = [1n];                                    // ∏(s·x − R) with R = r·10^d
+    for(const r of roots){
+      const R = BigInt(Math.round(r * Math.pow(10, d)));
+      const n = new Array(c.length + 1).fill(0n);
+      c.forEach((ci, i) => { n[i] += ci * s; n[i + 1] -= ci * R; });
+      c = n;
+    }
+    return c.map(ci => decimalOf(ci, d * roots.length));   // divide by s^n
+  }
+  // polynomial from coefficients (zero terms dropped, ±1 hidden)
+  function polyTex(cs){
+    const deg = cs.length - 1;
+    let out = '';
+    cs.forEach((c, i) => {
+      if(c.zero) return;
+      const p = deg - i;
+      const v = p === 0 ? c.tex : (c.one ? '' : c.tex) + (p === 1 ? 'x' : `x^{${p}}`);
+      out += out ? ` ${c.neg ? '-' : '+'} ${v}` : (c.neg ? '-' : '') + v;
+    });
+    return out || '0';
+  }
+
+  // factored form with multiplicities as powers, sorted, each factor coloured
+  function factoredTex(roots, name, col, fmt){
+    if(!roots.length) return '1';
+    const groups = [];
+    for(const r of [...roots].sort((u, v) => u - v)){
+      const last = groups[groups.length - 1];
+      if(last && same(last.r, r)) last.n++; else groups.push({ r, n: 1 });
+    }
+    return groups.map(({ r, n }) => {
+      const pow = n > 1 ? `^{${n}}` : '';
+      if(r === 0) return col(name, 'x' + pow);
+      return `\\left(${col(name, `x ${r < 0 ? '+' : '-'} ${fmt(Math.abs(r))}`)}\\right)${pow}`;
+    }).join('');
+  }
+
+  const amber  = C => C.dark ? 'rgba(255,220,60,0.85)'  : 'rgba(180,140,0,0.80)';
+  const violet = C => C.dark ? 'rgba(180,130,220,0.55)' : 'rgba(130,60,180,0.45)';
+  const paper  = C => C.dark ? '#232323' : '#fafafa';      // canvas background, for open circles
+
+  const tool = {
+    title: 'Rational Function Explorer',
+    file: 'rational_function',
+    defaults: { num: [-1.5, 1.5], den: [-0.5, 2.5], a: 1 },
+    view: { xMin: -5, xMax: 5, yMin: -10, yMax: 10 },
+    f,
+
+    // x-values the curve must not be drawn across (true vertical asymptotes)
+    breaks: S => analyze(S).asymps,
+
+    // "Integers only" switched on
+    roundToInt(S){
+      S.num = S.num.map(r => Math.round(r) || 0);
+      S.den = S.den.map(r => Math.round(r) || 0);
+      S.a = Math.round(S.a) || (Math.sign(S.a) || 1);
+    },
+
+    // ── URL:  n=-1.5,1.5 & d=-0.5,2.5 & a=1  (same as the original explorer) ──
+    encode(p, S, fmt){
+      p.set('n', S.num.map(fmt).join(','));
+      p.set('d', S.den.map(fmt).join(','));
+      p.set('a', fmt(S.a));
+    },
+    decode(p, S){
+      const ok = v => isFinite(v) && Math.abs(v) <= 1e6;
+      const list = key => p.get(key).split(',').filter(t => t.trim() !== '').map(Number)
+                           .filter(ok).slice(0, 20).map(v => parseFloat(v.toFixed(6)));
+      if(p.has('n')) S.num = list('n');
+      if(p.has('d')) S.den = list('d');
+      if(p.has('a') && p.get('a').trim() !== '' && ok(Number(p.get('a'))))
+        S.a = parseFloat(Number(p.get('a')).toFixed(6));
+    },
+
+    // dashed vertical lines at denominator roots; horizontal / slant asymptote
+    under(g, S, api, C){
+      const { X, Y, W, H } = api;
+      const A = analyze(S);
+      g.save();
+      g.setLineDash([6, 4]); g.lineCap = 'butt';
+      g.strokeStyle = violet(C);
+      for(const x of [...new Set(S.den)]){
+        const hot = S.den.some((s, i) => same(s, x) && api.active.has('d' + i));
+        g.lineWidth = hot ? 4.5 : 3;
+        g.beginPath(); g.moveTo(X(x), 0); g.lineTo(X(x), H); g.stroke();
+      }
+      if(A.asymps.length && A.degDiff <= 1 && S.a !== 0){
+        // quotient of the division:  0,  a,  or  a(x − Σr + Σs)
+        const q = A.degDiff < 0 ? () => 0
+                : A.degDiff === 0 ? () => S.a
+                : x => S.a * (x - S.num.reduce((t, r) => t + r, 0) + S.den.reduce((t, s) => t + s, 0));
+        const x0 = api.invX(0), x1 = api.invX(W);
+        const yc = y => Y(api.clamp(y, -1e7, 1e7));
+        g.setLineDash([8, 5]);
+        g.strokeStyle = amber(C); g.lineWidth = 2.5;
+        g.beginPath(); g.moveTo(0, yc(q(x0))); g.lineTo(W, yc(q(x1))); g.stroke();
+      }
+      g.restore();
+    },
+
+    // list order = drawing order (last is on top).  Where a red and a purple dot coincide,
+    // purple is on top at an asymptote and red is on top at a hole.
+    handles(S, api){
+      const { X, snap } = api;
+      const A = analyze(S);
+      const isHole = x => A.holes.some(h => same(h.x, x));
+      const move = (list, i) => tx => {
+        const lo = api.invX(0), hi = api.invX(api.W);           // stay in view
+        let x = api.clamp(tx, lo, hi);
+        x = api.intMode ? (Math.round(x) || 0) : snap(x, api.stepX());
+        // magnet: land exactly on a nearby dot (to make holes / repeated roots)
+        let best = MAGNET;
+        for(const r of [...S.num, ...S.den]){
+          if(r === list[i]) continue;
+          const d = Math.abs(X(r) - X(api.clamp(tx, lo, hi)));
+          if(d < best){ best = d; x = r; }
+        }
+        list[i] = x;
+      };
+      const yl = [api.invY(0), api.invY(api.H)];
+      const nums = S.num.map((x, i) => ({ id: 'n' + i, color: 'red', r: 8, axis: 'x', x, y: 0, drag: move(S.num, i) }));
+      const dens = S.den.map((x, i) => ({ id: 'd' + i, color: 'purple', r: 8, axis: 'x', x, y: 0,
+                                          seg: [x, yl[0], x, yl[1]], drag: move(S.den, i) }));
+      return [...dens.filter(h => isHole(h.x)), ...nums, ...dens.filter(h => !isHole(h.x))];
+    },
+
+    // top layer: open circles at holes, then tooltips for the active dots
+    labels(g, S, api, C, active){
+      const { X, Y } = api;
+      const A = analyze(S);
+      for(const h of A.holes){
+        if(!isFinite(h.y)) continue;
+        g.save();
+        g.beginPath(); g.arc(X(h.x), Y(h.y), 6, 0, 2 * Math.PI);
+        g.fillStyle = paper(C); g.fill();
+        g.strokeStyle = C.curve; g.lineWidth = 2.5; g.stroke();
+        g.restore();
+      }
+      const times = (list, x) => { const c = count(list, x); return c > 1 ? `  (×${c})` : ''; };
+      const holeAt = x => A.holes.find(h => same(h.x, x));
+      // tooltips go above (roots) / below (asymptotes) the axis, unless that would cover a hole
+      S.num.forEach((x, i) => {
+        if(!active.has('n' + i)) return;
+        const h = holeAt(x), side = h && h.y > 0 ? 'below' : 'above';
+        label(g, ['root  x = ' + plain(x) + times(S.num, x)], X(x), Y(0), side, C.red, C, api, 14);
+      });
+      S.den.forEach((x, i) => {
+        if(!active.has('d' + i)) return;
+        const h = holeAt(x), side = h && h.y < 0 ? 'above' : 'below';
+        label(g, [(h ? 'hole' : 'asymptote') + '  x = ' + plain(x) + times(S.den, x)], X(x), Y(0), side, C.purple, C, api, 14);
+      });
+    },
+
+    tex(S, col, fmt){
+      if(S.a === 0) return 'f(x) = 0';
+      const aT = S.a === 1 ? '' : S.a === -1 ? '-' : fmt(S.a);
+      const lead = aT === '' ? '' : col('blue', aT) + (aT === '-' ? '' : '\\,');
+      const body = (N, D) => S.den.length ? `${lead}\\dfrac{${N}}{${D}}`
+                           : S.num.length ? `${lead}${N}` : col('blue', fmt(S.a));
+      const line1 = body(factoredTex(S.num, 'red', col, fmt), factoredTex(S.den, 'purple', col, fmt));
+      if(S.num.length < 2 && S.den.length < 2)
+        return `\\begin{aligned} f(x) &= ${line1} \\end{aligned}`;
+      const cn = expand(S.num), cd = expand(S.den);
+      const rel = [...cn, ...cd].every(c => c.exact) ? '=' : '\\approx';
+      return `\\begin{aligned} f(x) &= ${line1} \\\\[6pt] &${rel} ${body(polyTex(cn), polyTex(cd))} \\end{aligned}`;
+    },
+
+    // page controls owned by this tool (the scale slider), refreshed on every render
+    sync(S, api){
+      const sl = document.getElementById('scale-slider');
+      sl.step = api.intMode ? '1' : '0.1';
+      sl.value = String(S.a);
+      document.getElementById('scale-val').textContent = plain(S.a);
+    },
+  };
+  return tool;
+})();
+
+const TOOL = RATIONAL;
+
+// ═════════════════════════════════════════════════════════════════
+//  SHARED GRAPHING CORE  (as in story_explorer_v6.html, plus three optional tool hooks:
+//    TOOL.breaks(S)         x-values the curve is never drawn across (poles)
+//    TOOL.encode / decode   URL state for tools whose values aren't plain numbers
+//    TOOL.sync(S, api)      refresh tool-owned page controls after each render)
+// ═════════════════════════════════════════════════════════════════
+const S = structuredClone(TOOL.defaults);  // current parameters (deep copy: may hold arrays)
+let intMode = false;                       // "Integers only" switch (tools read this)
+let xMin, xMax, yMin, yMax;
+function resetView(){ ({ xMin, xMax, yMin, yMax } = TOOL.view); }
+resetView();
+
+// grab sizes in CSS px
+const HIT    = () => 14;   // dots
+const VLINE  = () => 8;    // vertical-line handles (half-width)
+const SEG    = () => 7;    // bars (half-width)
+
+// zoom limits: each axis span stays within [SPAN_MIN, SPAN_MAX]
+const SPAN_MIN = 1e-3, SPAN_MAX = 1e6, COORD_MAX = 1e7;
+const DIR_THRESH = 4;    // CSS px of motion before resolving overlapping handles
+
+// ── canvas (sharp on hi-DPI screens: drawing is done in CSS px) ──
 const canvas = document.getElementById('plot');
 const ctx    = canvas.getContext('2d');
-let activeCtx = ctx;  // draw() targets this — swapped during export
-
+let W = 0, H = 0;
 function setCanvasSize(){
-  const W = document.getElementById('canvas-wrap').clientWidth;
-  canvas.width  = W;
-  canvas.height = Math.round(W * 3/4);
+  W = document.getElementById('canvas-wrap').clientWidth;
+  H = Math.round(W * 3/4);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-function toCanvas(x, y){
-  const W = canvas.width, H = canvas.height;
-  return [(x - xMin) / (xMax - xMin) * W,
-          (1 - (y - yMin) / (yMax - yMin)) * H];
-}
-function fromCanvas(px){ return xMin + px / canvas.width * (xMax - xMin); }
+const X    = x  => (x - xMin) / (xMax - xMin) * W;
+const Y    = y  => (1 - (y - yMin) / (yMax - yMin)) * H;
+const invX = px => xMin + px / W * (xMax - xMin);
+const invY = py => yMin + (1 - py / H) * (yMax - yMin);
 
-// ─────────────────────────────────────────────────────────────────
-//  COLORS
-// ─────────────────────────────────────────────────────────────────
+// ── numbers & snapping ──
+const decStep = v => Math.pow(10, Math.floor(Math.log10(v)));
+const clamp   = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+function snap(v, s){
+  const d = Math.max(0, Math.ceil(-Math.log10(s) - 1e-9));
+  const r = parseFloat((Math.round(v / s) * s).toFixed(d));
+  return r === 0 ? 0 : r;                      // no negative zero
+}
+// snapping step tracks the zoom level: 0.1 at the default view
+const stepX = () => decStep((xMax - xMin) / 50);
+const stepY = () => decStep((yMax - yMin) / 50);
+function fmt(v){
+  if(Math.abs(v) < 1e-12) return '0';
+  // 4 decimal places normally; more only for tiny values (deep zoom)
+  return String(parseFloat(v.toFixed(Math.abs(v) < 0.01 ? 6 : 4)));
+}
+
+// ── colors ──
+let forceLight = false;   // set during PNG export
+function isDark(){ return !forceLight && window.matchMedia('(prefers-color-scheme: dark)').matches; }
 function getColors(){
-  const d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const d = isDark();
   return {
-    axis:    d ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.15)',
-    grid:    d ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-    curve:   d ? '#85B7EB' : '#185FA5',
-    numRoot: d ? '#F09595' : '#E24B4A',
-    numRootS:d ? '#E24B4A' : '#A32D2D',
-    denRoot: d ? '#C39BDB' : '#9B59B6',
-    denRootS:d ? '#9B59B6' : '#6C3483',
-    asymp:   d ? 'rgba(180,130,220,0.55)' : 'rgba(130,60,180,0.45)',
-    hasym:   d ? 'rgba(255,220,60,0.85)'  : 'rgba(180,140,0,0.80)',
-    hole:    d ? '#85B7EB' : '#185FA5',
-    text:    d ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)',
-    bg:      d ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)'
+    dark:   d,
+    axis:   d ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.15)',
+    grid:   d ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+    text:   d ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)',
+    bg:     d ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+    curve:  d ? '#E4E8EC' : '#0D2A3A',
+    // parameter colors: [fill, stroke]; formula uses stroke (light) / fill (dark)
+    red:    d ? ['#F09595', '#E24B4A'] : ['#E8403E', '#A32D2D'],
+    blue:   d ? ['#7FB8E0', '#3D8BC0'] : ['#2A7AB0', '#174E73'],
+    green:  d ? ['#8FD48F', '#4FA84F'] : ['#45A845', '#24672A'],
+    purple: d ? ['#C9A0E8', '#9B59B6'] : ['#9B59B6', '#6C3483'],
   };
 }
+function texColor(name){ const c = getColors()[name]; return isDark() ? c[0] : c[1]; }
 
-// ─────────────────────────────────────────────────────────────────
-//  HOLE / CANCELLATION LOGIC
-// ─────────────────────────────────────────────────────────────────
-// Returns array of { x, order } for points where cancellation occurs
-// (numerator order >= denominator order at that x).
-// Also returns reduced root arrays for plotting purposes.
-function analyzeRoots(){
-  const holes = [];     // x values with removable discontinuities
-  const asymps = [];    // x values that remain true asymptotes
-
-  // Count multiplicities
-  const numCounts = countMultiplicities(numRoots);
-  const denCounts = countMultiplicities(denRoots);
-
-  // For each denominator root group, check if cancelled by numerator
-  for(const [xStr, denMult] of denCounts.entries()){
-    const x = parseFloat(xStr);
-    const numMult = numCounts.get(xStr) || 0;
-    if(numMult >= denMult){
-      holes.push(x);
-    } else {
-      asymps.push(x);
-    }
-  }
-  return { holes, asymps };
-}
-
-function countMultiplicities(roots){
-  const map = new Map();
-  for(const r of roots){
-    // find key within threshold
-    let found = null;
-    for(const k of map.keys()){
-      if(Math.abs(parseFloat(k) - r) < HOLE_THRESH){ found = k; break; }
-    }
-    if(found !== null) map.set(found, map.get(found) + 1);
-    else map.set(String(Math.round(r * 1000)/1000), 1);
-  }
-  return map;
-}
-
-// ─────────────────────────────────────────────────────────────────
-//  EVALUATE RATIONAL FUNCTION
-// ─────────────────────────────────────────────────────────────────
-function evalRational(x){
-  let num = scale;
-  for(const r of numRoots) num *= (x - r);
-  let den = 1;
-  for(const r of denRoots) den *= (x - r);
-  return num / den;
-}
+// everything a tool needs from the page, passed explicitly
+const api = { X, Y, invX, invY, snap, decStep, clamp, stepX, stepY,
+              get W(){ return W; }, get H(){ return H; },
+              get intMode(){ return intMode; },          // "Integers only" switch
+              get active(){ return activeIds; } };       // hovered / dragged handle ids
 
 // ─────────────────────────────────────────────────────────────────
 //  DRAW
 // ─────────────────────────────────────────────────────────────────
-function draw(){
-  const W = canvas.width, H = canvas.height, C = getColors();
-  activeCtx.clearRect(0, 0, W, H);
-  activeCtx.fillStyle = C.bg; activeCtx.fillRect(0, 0, W, H);
+function niceTick(span){
+  const rough = span / 7;
+  const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+  for(const m of [1, 2, 5, 10]) if(mag * m >= rough) return mag * m;
+  return mag * 10;
+}
+function fmtTick(v){
+  if(Math.abs(v) < 1e-9) return '';
+  const r = Math.round(v * 1e6) / 1e6;
+  return Number.isInteger(r) ? String(r) : String(parseFloat(r.toPrecision(4)));
+}
 
-  // adaptive tick spacing — aim for ~6-8 ticks across each axis
-  function niceTick(span){
-    const rough = span / 7;
-    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
-    for(const mult of [1, 2, 5, 10]){
-      if(mag * mult >= rough) return mag * mult;
-    }
-    return mag * 10;
-  }
-  const xTick = niceTick(xMax - xMin);
-  const yTick = niceTick(yMax - yMin);
-  const xStart = Math.ceil(xMin / xTick) * xTick;
-  const yStart = Math.ceil(yMin / yTick) * yTick;
+function draw(g){
+  const C = getColors();
+  g.clearRect(0, 0, W, H);
+  if(forceLight){ g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H); }
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
 
   // grid
-  activeCtx.strokeStyle = C.grid; activeCtx.lineWidth = 0.5;
-  for(let x = xStart; x <= xMax + 1e-9; x += xTick){
-    const [px] = toCanvas(x, 0);
-    activeCtx.beginPath(); activeCtx.moveTo(px, 0); activeCtx.lineTo(px, H); activeCtx.stroke();
-  }
-  for(let y = yStart; y <= yMax + 1e-9; y += yTick){
-    const [, py] = toCanvas(0, y);
-    activeCtx.beginPath(); activeCtx.moveTo(0, py); activeCtx.lineTo(W, py); activeCtx.stroke();
-  }
+  // tick positions by integer index (never an endless loop, at most ~200 lines)
+  const ticks = (lo, hi, t) => {
+    const out = [], i0 = Math.ceil(lo / t - 1e-6), i1 = Math.floor(hi / t + 1e-6);
+    for(let i = i0; i <= i1 && out.length < 200; i++) out.push(i * t);
+    return out;
+  };
+  const xTick = niceTick(xMax - xMin), yTick = niceTick(yMax - yMin);
+  const xs = ticks(xMin, xMax, xTick), ys = ticks(yMin, yMax, yTick);
+  g.strokeStyle = C.grid; g.lineWidth = 1;
+  for(const x of xs){ const px = X(x); g.beginPath(); g.moveTo(px, 0); g.lineTo(px, H); g.stroke(); }
+  for(const y of ys){ const py = Y(y); g.beginPath(); g.moveTo(0, py); g.lineTo(W, py); g.stroke(); }
 
   // axes
-  const [ox, oy] = toCanvas(0, 0);
-  activeCtx.strokeStyle = C.axis; activeCtx.lineWidth = 2;
-  activeCtx.beginPath(); activeCtx.moveTo(toCanvas(xMin,0)[0], oy); activeCtx.lineTo(toCanvas(xMax,0)[0], oy); activeCtx.stroke();
-  activeCtx.beginPath(); activeCtx.moveTo(ox, toCanvas(0,yMin)[1]); activeCtx.lineTo(ox, toCanvas(0,yMax)[1]); activeCtx.stroke();
+  const ox = X(0), oy = Y(0);
+  g.strokeStyle = C.axis; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(0, oy); g.lineTo(W, oy); g.stroke();
+  g.beginPath(); g.moveTo(ox, 0); g.lineTo(ox, H); g.stroke();
 
-  // axis labels
-  activeCtx.fillStyle = C.text; activeCtx.font = '14px system-ui,sans-serif';
-  const fmt = v => Math.abs(v) < 1e-9 ? '' : (Number.isInteger(Math.round(v*100)/100) ? String(Math.round(v)) : v.toPrecision(3).replace(/\.?0+$/, ''));
-  activeCtx.textAlign = 'center';
-  for(let x = xStart; x <= xMax + 1e-9; x += xTick){
+  // tick labels (kept on screen when an axis scrolls out of view)
+  g.fillStyle = C.text; g.font = '14px system-ui,sans-serif';
+  g.textAlign = 'center';
+  const lblY = clamp(oy + 16, 16, H - 4);
+  for(const x of xs){
     if(Math.abs(x) < xTick * 0.01) continue;
-    const [px] = toCanvas(x, 0);
-    activeCtx.fillText(fmt(x), px, oy + 16);
+    g.fillText(fmtTick(x), X(x), lblY);
   }
-  activeCtx.textAlign = 'right';
-  for(let y = yStart; y <= yMax + 1e-9; y += yTick){
+  g.textAlign = 'right';
+  const lblX = clamp(ox - 6, 30, W - 4);
+  for(const y of ys){
     if(Math.abs(y) < yTick * 0.01) continue;
-    const [, py] = toCanvas(0, y);
-    activeCtx.fillText(fmt(y), ox - 6, py + 5);
+    g.fillText(fmtTick(y), lblX, Y(y) + 5);
   }
 
-  const { holes, asymps } = analyzeRoots();
-  const allAsympX = [...asymps, ...holes]; // draw dashed line for both
+  g.save();
+  g.beginPath(); g.rect(0, 0, W, H); g.clip();
 
-  // asymptote dashed lines (for all denominator roots)
-  activeCtx.setLineDash([6, 4]);
-  activeCtx.strokeStyle = C.asymp; activeCtx.lineWidth = 3;
-  for(const ax of allAsympX){
-    const [px] = toCanvas(ax, 0);
-    activeCtx.beginPath(); activeCtx.moveTo(px, 0); activeCtx.lineTo(px, H); activeCtx.stroke();
-  }
-  activeCtx.setLineDash([]);
+  // layer 1: tool decorations under the curve
+  if(TOOL.under) TOOL.under(g, S, api, C);
 
-  // ── horizontal / slant / polynomial asymptote ───────────────────
-  // Count net (uncancelled) numerator and denominator degrees
-  const numCts = countMultiplicities(numRoots);
-  const denCts = countMultiplicities(denRoots);
-  let cancelCount = 0;
-  for(const [xStr, denMult] of denCts.entries()){
-    const numMult = numCts.get(xStr) || 0;
-    cancelCount += Math.min(numMult, denMult);
-  }
-  const netNum = numRoots.length - cancelCount;
-  const netDen = denRoots.length - cancelCount;
-  const degDiff = netNum - netDen;  // negative → y=0, zero → y=a, positive → polynomial
-
-  // Evaluate the asymptotic polynomial: a * product of uncancelled num roots only
-  // For the asymptote we need the leading behaviour: a·x^degDiff
-  // More precisely, the polynomial part of the division.
-  // We approximate it by: asymptote(x) = scale * x^degDiff * (product of cancelled-out corrections)
-  // Simplest correct form: evalAsymp(x) = scale * x^degDiff when all roots are 0,
-  // but for general roots we need polynomial long division.
-  // We compute it exactly by evaluating (numerator poly) / (denominator leading terms).
-
-  function evalAsymp(x){
-    if(degDiff < 0) return 0;
-    if(degDiff === 0) return scale;
-    // For degDiff > 0: the asymptote is the polynomial quotient of num/den.
-    // We compute this as: scale * product(x - numRoot) / product(x - denRoot),
-    // evaluated at large x, which equals scale * x^degDiff asymptotically.
-    // For an exact line/curve, do synthetic polynomial long division.
-    // Practical shortcut that's exact for monic polynomials:
-    // quotient poly has leading term x^degDiff; lower terms come from long division.
-    // We evaluate by: asymp(x) ≈ num(x)/den(x) for large |x|, but that's just the function.
-    // Instead compute the actual quotient polynomial coefficients via division.
-    const numCoeffs = expandPoly(numRoots).map(c => scale * c);
-    const denCoeffs = expandPoly(denRoots);
-    // Polynomial long division: numCoeffs / denCoeffs → quotient + remainder/den
-    let rem = [...numCoeffs];
-    const quot = [];
-    for(let i = 0; i <= degDiff; i++){
-      const q = rem[i] / denCoeffs[0];
-      quot.push(q);
-      for(let j = 0; j < denCoeffs.length; j++) rem[i + j] -= q * denCoeffs[j];
-    }
-    // Evaluate quotient polynomial at x
-    return quot.reduce((acc, c) => acc * x + c, 0);
-  }
-
-  // Only draw for horizontal (degDiff<=0) and slant (degDiff==1); skip parabolic and above
-  if(degDiff <= 1){
-  activeCtx.save();
-  activeCtx.beginPath(); activeCtx.rect(0, 0, W, H); activeCtx.clip();
-  activeCtx.setLineDash([8, 5]);
-  activeCtx.strokeStyle = C.hasym; activeCtx.lineWidth = 2.5;
-
-  if(degDiff < 0){
-    // y = 0: draw along x-axis (but only if it isn't already the x-axis visually)
-    const [, py] = toCanvas(0, 0);
-    activeCtx.beginPath(); activeCtx.moveTo(0, py); activeCtx.lineTo(W, py); activeCtx.stroke();
-  } else if(degDiff === 0){
-    // y = a: horizontal line
-    const [, py] = toCanvas(0, scale);
-    if(py >= 0 && py <= H){
-      activeCtx.beginPath(); activeCtx.moveTo(0, py); activeCtx.lineTo(W, py); activeCtx.stroke();
-    }
-  } else {
-    // polynomial asymptote — sample and draw as a curve
-    const steps = W * 2;
-    let penDown = false;
+  // layer 2: the curve, one piece per interval between breaks (poles)
+  const span = yMax - yMin, lo = yMin - 10 * span, hi = yMax + 10 * span;
+  g.strokeStyle = C.curve; g.lineWidth = 3.5; g.lineJoin = 'round'; g.lineCap = 'round';
+  const cuts = (TOOL.breaks ? TOOL.breaks(S) : []).filter(c => c > xMin && c < xMax).sort((u, v) => u - v);
+  const gapX = (xMax - xMin) * 1e-7;                 // stop this close to a pole
+  const ends = [xMin, ...cuts.flatMap(c => [c - gapX, c + gapX]), xMax];
+  for(let j = 0; j < ends.length; j += 2){
+    const xL = ends[j], xR = ends[j + 1];
+    if(!(xR > xL)) continue;
+    const steps = Math.max(4, Math.ceil((xR - xL) / (xMax - xMin) * W * 2));
+    let pen = false;
+    g.beginPath();
     for(let i = 0; i <= steps; i++){
-      const x = xMin + (i / steps) * (xMax - xMin);
-      const y = evalAsymp(x);
-      if(!isFinite(y)){ if(penDown){ activeCtx.stroke(); penDown = false; } continue; }
-      const [px, py] = toCanvas(x, y);
-      if(!penDown){ activeCtx.beginPath(); activeCtx.moveTo(px, py); penDown = true; }
-      else activeCtx.lineTo(px, py);
+      const x = i === steps ? xR : xL + (i / steps) * (xR - xL);
+      const y = TOOL.f(S, x);
+      if(!isFinite(y)){ pen = false; continue; }
+      const py = Y(clamp(y, lo, hi)), px = X(x);
+      if(!pen){ g.moveTo(px, py); pen = true; } else g.lineTo(px, py);
     }
-    if(penDown) activeCtx.stroke();
-  }
-  activeCtx.setLineDash([]);
-  activeCtx.restore();
-  } // end if(degDiff <= 1)
-
-  // ── curve ──────────────────────────────────────────────────────
-  // Plot each continuous interval separately, using the known asymptote
-  // positions to define interval boundaries. No heuristics needed —
-  // we simply never sample across a pole.
-
-  const POLE_MARGIN = 1e-6;   // stay this far from a true pole when sampling
-  const HOLE_EPS    = 1e-3;   // skip window half-width around removable holes
-  const STEPS_PER_PX = 3;     // samples per canvas pixel
-
-  // Build sorted list of true pole x-values (asymptotes only, not holes)
-  const poleXs = [...asymps].sort((a, b) => a - b);
-
-  // Build interval list: [xLeft, xRight] pairs, staying POLE_MARGIN inside poles
-  const intervalBounds = [];
-  let left = xMin;
-  for(const px of poleXs){
-    if(px > xMin && px < xMax){
-      intervalBounds.push([left, px - POLE_MARGIN]);
-      left = px + POLE_MARGIN;
-    }
-  }
-  intervalBounds.push([left, xMax]);
-
-  activeCtx.save();
-  activeCtx.beginPath(); activeCtx.rect(0, 0, W, H); activeCtx.clip();
-  activeCtx.strokeStyle = C.curve; activeCtx.lineWidth = 3; activeCtx.lineJoin = 'round';
-
-  function plotInterval(xL, xR){
-    const pixelWidth = (xR - xL) / (xMax - xMin) * W;
-    const steps = Math.max(4, Math.ceil(pixelWidth * STEPS_PER_PX));
-    const dx = (xR - xL) / steps;
-    let penDown = false;
-
-    for(let i = 0; i <= steps; i++){
-      const x = xL + i * dx;
-
-      // Skip tiny window around hole positions
-      let nearHole = false;
-      for(const hx of holes){
-        if(Math.abs(x - hx) < HOLE_EPS){ nearHole = true; break; }
-      }
-      if(nearHole){
-        if(penDown){ activeCtx.stroke(); penDown = false; }
-        continue;
-      }
-
-      const y = evalRational(x);
-      if(!isFinite(y)){
-        if(penDown){ activeCtx.stroke(); penDown = false; }
-        continue;
-      }
-
-      const [cpx, cpy] = toCanvas(x, y);
-      if(!penDown){ activeCtx.beginPath(); activeCtx.moveTo(cpx, cpy); penDown = true; }
-      else { activeCtx.lineTo(cpx, cpy); }
-    }
-    if(penDown) activeCtx.stroke();
+    g.stroke();
   }
 
-  for(const [xL, xR] of intervalBounds) plotInterval(xL, xR);
+  // layer 3: tool decorations over the curve (segments etc.)
+  if(TOOL.over) TOOL.over(g, S, api, C);
+  g.restore();
 
-  activeCtx.restore();
-
-  // ── dots on x-axis ──────────────────────────────────────────────
-  // Draw order matches drag priority: the dot that would be dragged
-  // is drawn on top. At overlapping positions: purple on top if true
-  // asymptote (den > num), red on top for hole or standalone root.
-  const [, ry] = toCanvas(0, 0);
-
-  // Two dots are "co-located" if their canvas x positions are within this many pixels
-  const OVERLAP_PX = 4;
-
-  function drawDot(canvasX, fill, stroke){
-    activeCtx.beginPath(); activeCtx.arc(canvasX, ry, 8, 0, 2 * Math.PI);
-    activeCtx.fillStyle = fill; activeCtx.fill();
-    activeCtx.strokeStyle = stroke; activeCtx.lineWidth = 1.5; activeCtx.stroke();
+  // layer 4: handles, in list order (last = on top)
+  for(const h of TOOL.handles(S, api)){
+    if(h.kind === 'vline') continue;           // drawn by the tool itself
+    const [fill, stroke] = C[h.color];
+    const px = X(h.x), py = Y(h.y), r = h.r || 7;
+    g.save();
+    if(h.disabled) g.globalAlpha = 0.45;
+    g.beginPath(); g.arc(px, py, r, 0, 2 * Math.PI);
+    g.fillStyle = fill; g.fill();
+    g.strokeStyle = stroke; g.lineWidth = 2; g.stroke();
+    g.restore();
   }
 
-  const denDrawn = new Array(denRoots.length).fill(false);
-  const numDrawn = new Array(numRoots.length).fill(false);
-
-  // First pass: overlapping pairs — draw bottom dot first, top dot second
-  for(let di = 0; di < denRoots.length; di++){
-    for(let ni = 0; ni < numRoots.length; ni++){
-      const [dCanvasX] = toCanvas(denRoots[di], 0);
-      const [nCanvasX] = toCanvas(numRoots[ni], 0);
-      if(Math.abs(dCanvasX - nCanvasX) < OVERLAP_PX){
-        const isAsymp = asymps.some(a => Math.abs(a - denRoots[di]) < HOLE_THRESH * 2);
-        if(isAsymp){
-          // purple on top: red underneath
-          drawDot(nCanvasX, C.numRoot, C.numRootS);
-          drawDot(dCanvasX, C.denRoot, C.denRootS);
-        } else {
-          // red on top: purple underneath
-          drawDot(dCanvasX, C.denRoot, C.denRootS);
-          drawDot(nCanvasX, C.numRoot, C.numRootS);
-        }
-        denDrawn[di] = true;
-        numDrawn[ni] = true;
-      }
-    }
+  // layer 5: direction arrows for the hovered / dragged handle(s)
+  for(const h of TOOL.handles(S, api)){
+    if(!activeIds.has(h.id)) continue;
+    drawArrows(g, h, C);
   }
 
-  // Second pass: non-overlapping dots, draw order doesn't matter
-  for(let di = 0; di < denRoots.length; di++){
-    if(!denDrawn[di]){
-      const [rx] = toCanvas(denRoots[di], 0);
-      drawDot(rx, C.denRoot, C.denRootS);
-    }
-  }
-  for(let ni = 0; ni < numRoots.length; ni++){
-    if(!numDrawn[ni]){
-      const [rx] = toCanvas(numRoots[ni], 0);
-      drawDot(rx, C.numRoot, C.numRootS);
-    }
-  }
-
-  // ── hole circles (open circles on the curve) ──
-  for(const hx of holes){
-    // y-value of the reduced function at hx (limit)
-    const holeY = limitAtHole(hx);
-    if(isFinite(holeY) && holeY >= yMin && holeY <= yMax){
-      const [hpx, hpy] = toCanvas(hx, holeY);
-      activeCtx.beginPath(); activeCtx.arc(hpx, hpy, 6, 0, 2 * Math.PI);
-      activeCtx.strokeStyle = C.hole; activeCtx.lineWidth = 2.5;
-      activeCtx.fillStyle = getBodyBg(); activeCtx.fill(); activeCtx.stroke();
-    }
-  }
+  // layer 6: tool tooltips / labels (top-most)
+  if(TOOL.labels) TOOL.labels(g, S, api, C, activeIds);
 }
 
-function getBodyBg(){
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? '#1a1a1a' : '#ffffff';
-}
-
-// Approximate the removable discontinuity value by evaluating nearby
-function limitAtHole(hx){
-  const eps = 1e-5;
-  const y1 = evalRational(hx + eps);
-  const y2 = evalRational(hx - eps);
-  if(isFinite(y1) && isFinite(y2)) return (y1 + y2) / 2;
-  if(isFinite(y1)) return y1;
-  if(isFinite(y2)) return y2;
-  return NaN;
+function drawArrows(g, h, C){
+  const stroke = C[h.color][1];
+  const r = (h.r || 7) + 5, L = 11;
+  const px = X(h.x);
+  const py = h.kind === 'vline' ? H - 22 : Y(h.y);
+  const dirs = h.axis === 'x' ? [[1,0],[-1,0]] : h.axis === 'y' ? [[0,-1],[0,1]] : [[1,0],[-1,0],[0,-1],[0,1]];
+  g.save();
+  g.strokeStyle = stroke; g.fillStyle = stroke; g.lineWidth = 2;
+  for(const [dx, dy] of dirs){
+    const x0 = px + dx * r, y0 = py + dy * r, x1 = px + dx * (r + L), y1 = py + dy * (r + L);
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+    g.beginPath();
+    g.moveTo(x1 + dx * 4, y1 + dy * 4);
+    g.lineTo(x1 - dy * 4, y1 + dx * 4);
+    g.lineTo(x1 + dy * 4, y1 - dx * 4);
+    g.closePath(); g.fill();
+  }
+  g.restore();
 }
 
 // ─────────────────────────────────────────────────────────────────
-//  MATHJAX DISPLAY
+//  FORMULA (KaTeX)
 // ─────────────────────────────────────────────────────────────────
-window.addEventListener('load', () => {
-  MathJax.startup.promise.then(() => {
-    mathJaxReady = true;
-    updateDisplay();
-  });
-});
-
-function isNice(v){ return Math.abs(v - Math.round(v * 10) / 10) < 1e-9; }
-function fmtNum(v){
-  const r = Math.round(v * 10) / 10;
-  if(Number.isInteger(r)) return String(Math.round(r));
-  return r.toFixed(1);
+function col(name, s){ return `\\textcolor{${texColor(name)}}{${s}}`; }
+function updateFormula(){
+  const el = document.getElementById('formula-math');
+  let tex;
+  try { tex = TOOL.tex(S, col, fmt, api); }
+  catch(e){ tex = '\\text{(formula unavailable for these values)}'; }
+  if(window.katex) katex.render(tex, el, { displayMode: true, throwOnError: false });
+  else el.textContent = tex;
 }
 
-function latexFactor(r){
-  const v = Math.round(r * 10) / 10;
-  if(Math.abs(v) < 1e-9) return 'x';
-  const av = fmtNum(Math.abs(v));
-  return v > 0 ? `(x - ${av})` : `(x + ${av})`;
+function render(){
+  draw(ctx);
+  updateFormula();
+  if(TOOL.sync) TOOL.sync(S, api);
 }
 
-function latexFactorGroup(roots){
-  if(roots.length === 0) return '1';
-  const THRESH = 0.05;
-  const groups = [];
-  const sorted = [...roots].sort((a,b) => a - b);
-  for(const r of sorted){
-    const last = groups[groups.length - 1];
-    if(last && Math.abs(r - last.r) < THRESH) last.count++;
-    else groups.push({ r, count: 1 });
+// ─────────────────────────────────────────────────────────────────
+//  HIT TESTING with layers
+//  All handles within the grab radius whose distance is close to the
+//  nearest one are candidates.  One candidate → grab it.  Several
+//  (overlapping handles) → wait for the first few px of motion and give
+//  it to the topmost handle whose drag direction matches the motion.
+// ─────────────────────────────────────────────────────────────────
+function candidates(px, py){
+  const hs = TOOL.handles(S, api);
+  const found = [];
+  for(let i = hs.length - 1; i >= 0; i--){        // topmost first
+    const h = hs[i];
+    if(h.disabled) continue;
+    let d;
+    if(h.kind === 'vline'){
+      d = Math.abs(px - X(h.x)) + 3;               // lines yield to dots
+      if(d > VLINE() + 3) continue;
+    } else {
+      d = Math.hypot(px - X(h.x), py - Y(h.y));
+      if(d > HIT()) continue;
+    }
+    found.push({ h, d });
   }
-  return groups.map(({ r, count }) => {
-    const base = latexFactor(r);
-    return count === 1 ? base : `${base}^{${count}}`;
-  }).join('\\,');
-}
-
-// Expand (x-r1)(x-r2)... into coefficient array [leading, ..., constant]
-function expandPoly(rs){
-  let c = [1];
-  for(const r of rs){
-    const n = new Array(c.length + 1).fill(0);
-    for(let i = 0; i < c.length; i++){ n[i] += c[i]; n[i+1] -= r * c[i]; }
-    c = n;
-  }
-  return c;  // coefficients of x^n, x^(n-1), ..., x^0
-}
-
-function latexCoeff(c, deg, isFirst){
-  const raw = Math.round(c * 1000) / 1000;
-  if(Math.abs(raw) < 1e-9) return '';
-  const neg = raw < 0;
-  const abs = Math.abs(raw);
-  const numStr = (abs === 1 && deg > 0) ? '' : fmtNum(abs);
-  const varPart = deg === 0 ? '' : deg === 1 ? 'x' : `x^{${deg}}`;
-  return isFirst ? `${neg ? '-' : ''}${numStr}${varPart}`
-                 : `${neg ? ' - ' : ' + '}${numStr}${varPart}`;
-}
-
-function latexExpanded(roots){
-  const coeffs = expandPoly(roots);
-  const n = coeffs.length - 1;
-  const parts = [];
-  for(let i = 0; i <= n; i++){
-    const p = latexCoeff(coeffs[i], n - i, i === 0);
-    if(p) parts.push(p);
-  }
-  return parts.length ? parts.join('') : '0';
-}
-
-function buildLatex(){
-  const av = fmtNum(Math.abs(scale));
-  let aStr = '';
-  if(scale === 0)       aStr = '0';
-  else if(scale === 1)  aStr = '';
-  else if(scale === -1) aStr = '-';
-  else if(scale > 0)    aStr = av + '\\,';
-  else                  aStr = '-' + av + '\\,';
-
-  if(scale === 0) return `\\(\\begin{aligned} f(x) &= 0 \\end{aligned}\\)`;
-
-  const numFactored  = latexFactorGroup(numRoots);
-  const denFactored  = latexFactorGroup(denRoots);
-  const numExpanded  = latexExpanded(numRoots);
-  const denExpanded  = latexExpanded(denRoots);
-
-  // Only show the expanded line if it differs from the factored form
-  const numSame = numRoots.length === 1;
-  const denSame = denRoots.length === 1;
-  const showExpanded = !numSame || !denSame;
-
-  const line1 = `f(x) &= ${aStr}\\dfrac{${numFactored}}{${denFactored}}`;
-  const line2 = showExpanded
-    ? `&= ${aStr}\\dfrac{${numExpanded}}{${denExpanded}}`
-    : '';
-
-  return showExpanded
-    ? `\\(\\begin{aligned} ${line1} \\\\ ${line2} \\end{aligned}\\)`
-    : `\\(\\begin{aligned} ${line1} \\end{aligned}\\)`;
-}
-
-let renderPending = false;
-function updateDisplay(){
-  if(!mathJaxReady) return;
-  const el = document.getElementById('math-output');
-  el.innerHTML = buildLatex();
-  if(renderPending) return;
-  renderPending = true;
-  MathJax.typesetPromise([el]).then(() => { renderPending = false; });
-}
-
-// ─────────────────────────────────────────────────────────────────
-//  SCALE SLIDER
-// ─────────────────────────────────────────────────────────────────
-const slider   = document.getElementById('scale-slider');
-const scaleVal = document.getElementById('scale-val');
-slider.addEventListener('input', () => {
-  scale = Math.round(parseFloat(slider.value) * 10) / 10;
-  scaleVal.textContent = fmtNum(scale);
-  draw(); updateDisplay();
-});
-
-// ─────────────────────────────────────────────────────────────────
-//  HIT TESTING & DRAGGING
-// ─────────────────────────────────────────────────────────────────
-function hitTest(cx, cy){
-  const [, ry] = toCanvas(0, 0);
-  const { holes, asymps } = analyzeRoots();
-
-  // At a given canvas x, determine which dot type is visually on top:
-  // - pure asymptote (den > num): purple on top → test den first
-  // - hole or pure root (num >= den): red on top → test num first
-  // We do one unified pass checking both lists, preferring the top dot.
-
-  let bestHit = null, bestDist = 14 * 14;
-
-  function check(kind, roots){
-    for(let i = roots.length - 1; i >= 0; i--){
-      const [rx] = toCanvas(roots[i], 0), dx = cx - rx, dy = cy - ry;
-      const d2 = dx*dx + dy*dy;
-      if(d2 < bestDist){ bestDist = d2; bestHit = { kind, idx: i }; }
+  // bars: handles may carry a `seg` [x1,y1,x2,y2] that also grabs them,
+  // but only when no dot is under the pointer (dots always win)
+  if(!found.length){
+    for(let i = hs.length - 1; i >= 0; i--){
+      const h = hs[i];
+      const segs = h.segs || (h.seg ? [h.seg] : []);       // one bar or several
+      if(h.disabled || !segs.length) continue;
+      const d = Math.min(...segs.map(sg => segDist(px, py, sg)));
+      if(d <= SEG()) found.push({ h, d });
     }
   }
-
-  // Check both lists for closest hit within radius.
-  // Then, if two dots are nearly co-located, let draw-order decide:
-  // re-test the winner against the other list at the same position.
-  check('num', numRoots);
-  check('den', denRoots);
-
-  // If we hit something, check if there's an overlapping dot of the other type.
-  // If so, the one drawn on top (den when it's a true asymptote, num otherwise) wins.
-  if(bestHit){
-    const winnerX = bestHit.kind === 'num' ? numRoots[bestHit.idx] : denRoots[bestHit.idx];
-    const otherRoots = bestHit.kind === 'num' ? denRoots : numRoots;
-    const otherKind  = bestHit.kind === 'num' ? 'den' : 'num';
-    for(let i = otherRoots.length - 1; i >= 0; i--){
-      if(Math.abs(otherRoots[i] - winnerX) < HOLE_THRESH * 2){
-        // There's an overlapping dot — decide by visual order
-        const isAsymp = asymps.some(a => Math.abs(a - winnerX) < HOLE_THRESH * 2);
-        // If it's a true asymptote, den is on top; otherwise num is on top
-        const topKind = isAsymp ? 'den' : 'num';
-        if(topKind !== bestHit.kind) bestHit = { kind: otherKind, idx: i };
-        break;
-      }
-    }
-  }
-
-  return bestHit;
+  if(!found.length) return [];
+  const dMin = Math.min(...found.map(f => f.d));
+  return found.filter(f => f.d <= dMin + 6).map(f => f.h);
 }
+
+function segDist(px, py, [x1, y1, x2, y2]){
+  const ax = X(x1), ay = Y(y1), bx = X(x2), by = Y(y2);
+  const vx = bx - ax, vy = by - ay, L2 = vx * vx + vy * vy;
+  const t = L2 ? clamp(((px - ax) * vx + (py - ay) * vy) / L2, 0, 1) : 0;
+  return Math.hypot(px - (ax + t * vx), py - (ay + t * vy));
+}
+
+function chooseByDirection(cands, dx, dy){
+  const dir = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+  return cands.find(h => h.axis === dir)
+      || cands.find(h => h.axis === 'xy')
+      || cands[0];
+}
+
+let drag = null;      // { id, offX, offY, start }
+let pending = null;   // { cands, px, py }
+let panning = null;   // { mx, my }
+let activeIds = new Set();
 
 function getPos(e){
-  const r = canvas.getBoundingClientRect(), s = canvas.width / r.width;
-  if(e.touches) return [(e.touches[0].clientX - r.left) * s, (e.touches[0].clientY - r.top) * s];
-  return [(e.clientX - r.left) * s, (e.clientY - r.top) * s];
+  const r = canvas.getBoundingClientRect();
+  return [e.clientX - r.left, e.clientY - r.top];
 }
 
-function getRootX(hit){ return hit.kind === 'num' ? numRoots[hit.idx] : denRoots[hit.idx]; }
-function setRootX(hit, x){ if(hit.kind === 'num') numRoots[hit.idx] = x; else denRoots[hit.idx] = x; }
-
-canvas.addEventListener('mousedown', e => {
-  const [cx, cy] = getPos(e), hit = hitTest(cx, cy);
-  if(hit){
-    dragging = { ...hit, offsetX: cx - toCanvas(getRootX(hit), 0)[0] };
-    canvas.style.cursor = 'grabbing';
-  } else {
-    // Start panning — record the math-space anchor point
-    const mx = xMin + (cx / canvas.width)  * (xMax - xMin);
-    const my = yMin + (1 - cy / canvas.height) * (yMax - yMin);
-    panning = { mx, my };
-    canvas.style.cursor = 'move';
-  }
-});
-canvas.addEventListener('mousemove', e => {
-  const [cx, cy] = getPos(e);
-  if(dragging){
-    let nx = Math.round(fromCanvas(cx - dragging.offsetX) * 10) / 10;
-    nx = Math.max(xMin, Math.min(xMax, nx));
-    setRootX(dragging, nx);
-    draw(); updateDisplay();
-  } else if(panning){
-    // Shift the view so the anchor point stays under the mouse
-    const mx = xMin + (cx / canvas.width)  * (xMax - xMin);
-    const my = yMin + (1 - cy / canvas.height) * (yMax - yMin);
-    const dx = panning.mx - mx;
-    const dy = panning.my - my;
-    xMin += dx; xMax += dx;
-    yMin += dy; yMax += dy;
-    draw();
-  } else {
-    const hit = hitTest(cx, cy);
-    canvas.style.cursor = hit ? 'grab' : 'default';
-  }
-});
-function stopDrag(){
-  dragging = null; panning = null;
-  canvas.style.cursor = 'default';
+function startDrag(h, px, py){
+  drag = { id: h.id,
+           offX: X(h.x) - px,
+           offY: h.kind === 'vline' ? 0 : Y(h.y) - py,
+           start: structuredClone(S) };
+  activeIds = new Set([h.id]);
+  canvas.style.cursor = 'grabbing';
 }
-canvas.addEventListener('mouseup', stopDrag);
-canvas.addEventListener('mouseleave', stopDrag);
 
-canvas.addEventListener('touchstart', e => {
-  e.preventDefault();
-  const [cx, cy] = getPos(e), hit = hitTest(cx, cy);
-  if(hit){
-    dragging = { ...hit, offsetX: cx - toCanvas(getRootX(hit), 0)[0] };
-  } else {
-    const mx = xMin + (cx / canvas.width)  * (xMax - xMin);
-    const my = yMin + (1 - cy / canvas.height) * (yMax - yMin);
-    panning = { mx, my };
-  }
-}, { passive: false });
-canvas.addEventListener('touchmove', e => {
-  e.preventDefault();
-  const [cx, cy] = getPos(e);
-  if(dragging){
-    let nx = Math.round(fromCanvas(cx - dragging.offsetX) * 10) / 10;
-    nx = Math.max(xMin, Math.min(xMax, nx));
-    setRootX(dragging, nx);
-    draw(); updateDisplay();
-  } else if(panning){
-    const mx = xMin + (cx / canvas.width)  * (xMax - xMin);
-    const my = yMin + (1 - cy / canvas.height) * (yMax - yMin);
-    const dx = panning.mx - mx;
-    const dy = panning.my - my;
-    xMin += dx; xMax += dx;
-    yMin += dy; yMax += dy;
-    draw();
-  }
-}, { passive: false });
-canvas.addEventListener('touchend', stopDrag);
-
-// ─────────────────────────────────────────────────────────────────
-//  CONTEXT MENU
-// ─────────────────────────────────────────────────────────────────
-const ctxMenu     = document.getElementById('ctx-menu');
-const ctxAddRoot  = document.getElementById('ctx-add-root');
-const ctxAddAsymp = document.getElementById('ctx-add-asymp');
-const ctxHr       = document.getElementById('ctx-hr');
-const ctxDupRoot  = document.getElementById('ctx-dup-root');
-const ctxRemRoot  = document.getElementById('ctx-rem-root');
-const ctxDupAsymp = document.getElementById('ctx-dup-asymp');
-const ctxRemAsymp = document.getElementById('ctx-rem-asymp');
-
-let ctxState = null;  // { kind: 'axis', mathX } | { kind: 'dot', mathX, numIdx, denIdx }
-
-function showMenu(pageX, pageY){
-  ctxMenu.style.display = 'block';
-  const menuW = 190;
-  const left = (pageX + menuW > window.innerWidth) ? pageX - menuW : pageX;
-  ctxMenu.style.left = left + 'px';
-  ctxMenu.style.top  = pageY + 'px';
+function doDrag(px, py){
+  const h = TOOL.handles(S, api).find(q => q.id === drag.id);
+  if(!h || h.disabled) return;
+  h.drag(invX(px + drag.offX), invY(py + drag.offY), drag.start);
+  if(TOOL.onEdit) TOOL.onEdit();
+  render();
 }
-function hideMenu(){ ctxMenu.style.display = 'none'; ctxState = null; }
 
-// Show/hide individual menu items
-function setVisible(el, v){ el.style.display = v ? 'block' : 'none'; }
+function cursorFor(cands){
+  if(!cands.length) return 'default';
+  if(cands.length > 1) return 'grab';
+  return cands[0].axis === 'x' ? 'ew-resize' : cands[0].axis === 'y' ? 'ns-resize' : 'grab';
+}
 
-canvas.addEventListener('contextmenu', e => {
-  e.preventDefault();
-  const [cx, cy] = getPos(e);
-  const [, axisCanvasY] = toCanvas(0, 0);
-  const nearAxis = Math.abs(cy - axisCanvasY) < 18;
-  if(!nearAxis) return;
+// ── pointer handling: ONE pointer at a time ──
+// Only the primary pointer (mouse, pen, or the first finger on a touch board) is followed.
+// Extra fingers — e.g. a hand pointing at the board mid-drag — are ignored completely.
+// If a new press arrives while an old one still looks active (its release was lost),
+// the old interaction is dropped, so the page can never get stuck in a drag or pan.
+let activePointer = null;      // pointerId being followed, or null
 
-  const mathX = Math.round((xMin + (cx / canvas.width) * (xMax - xMin)) * 10) / 10;
+function resetInteraction(){
+  drag = null; pending = null; panning = null; activePointer = null;
+}
 
-  // Find all num/den roots within hit radius of this x position
-  const numIdx = numRoots.reduce((best, r, i) => {
-    const [rx] = toCanvas(r, 0);
-    return Math.abs(rx - cx) < 14 && (best === -1 || Math.abs(r - mathX) < Math.abs(numRoots[best] - mathX)) ? i : best;
-  }, -1);
-  const denIdx = denRoots.reduce((best, r, i) => {
-    const [rx] = toCanvas(r, 0);
-    return Math.abs(rx - cx) < 14 && (best === -1 || Math.abs(r - mathX) < Math.abs(denRoots[best] - mathX)) ? i : best;
-  }, -1);
+canvas.addEventListener('pointerdown', e => {
+  if(!e.isPrimary) return;                                     // ignore extra fingers
+  if(e.pointerType === 'mouse' && e.button !== 0) return;
+  if(activePointer !== null) resetInteraction();               // a stale press: start fresh
+  activePointer = e.pointerId;
+  try { canvas.setPointerCapture(e.pointerId); } catch(err){ /* capture is optional */ }
+  const [px, py] = getPos(e);
+  const c = candidates(px, py);
+  if(c.length === 1)      startDrag(c[0], px, py);
+  else if(c.length > 1){  pending = { cands: c, px, py }; activeIds = new Set(c.map(h => h.id)); draw(ctx); }
+  else { panning = { mx: invX(px), my: invY(py) }; canvas.style.cursor = 'move'; }
+});
 
-  const onDot = numIdx !== -1 || denIdx !== -1;
-
-  if(onDot){
-    ctxState = { kind: 'dot', mathX, numIdx, denIdx };
-    setVisible(ctxAddRoot,  false);
-    setVisible(ctxAddAsymp, false);
-    setVisible(ctxHr,       false);
-    setVisible(ctxDupRoot,  numIdx !== -1);
-    setVisible(ctxRemRoot,  numIdx !== -1);
-    setVisible(ctxDupAsymp, denIdx !== -1);
-    setVisible(ctxRemAsymp, denIdx !== -1);
-  } else {
-    ctxState = { kind: 'axis', mathX };
-    setVisible(ctxAddRoot,  true);
-    setVisible(ctxAddAsymp, true);
-    setVisible(ctxHr,       false);
-    setVisible(ctxDupRoot,  false);
-    setVisible(ctxRemRoot,  false);
-    setVisible(ctxDupAsymp, false);
-    setVisible(ctxRemAsymp, false);
+canvas.addEventListener('pointermove', e => {
+  if(activePointer !== null && e.pointerId !== activePointer) return;   // not the pointer we follow
+  const [px, py] = getPos(e);
+  if(pending){
+    const dx = px - pending.px, dy = py - pending.py;
+    if(Math.hypot(dx, dy) < DIR_THRESH) return;
+    const h = chooseByDirection(pending.cands, dx, dy);
+    startDrag(h, pending.px, pending.py);
+    pending = null;
   }
-  showMenu(e.pageX, e.pageY);
+  if(drag){ doDrag(px, py); return; }
+  if(panning){
+    const dx = panning.mx - invX(px), dy = panning.my - invY(py);
+    xMin += dx; xMax += dx; yMin += dy; yMax += dy;
+    clampView();
+    draw(ctx);
+    return;
+  }
+  if(activePointer === null) hover(px, py);
 });
 
-ctxAddRoot.addEventListener('click', () => {
-  if(!ctxState) return;
-  numRoots.push(ctxState.mathX);
-  hideMenu(); draw(); updateDisplay();
-});
-ctxAddAsymp.addEventListener('click', () => {
-  if(!ctxState) return;
-  denRoots.push(ctxState.mathX);
-  hideMenu(); draw(); updateDisplay();
-});
-ctxDupRoot.addEventListener('click', () => {
-  if(!ctxState || ctxState.numIdx === -1) return;
-  numRoots.push(numRoots[ctxState.numIdx]);  // exact duplicate
-  hideMenu(); draw(); updateDisplay();
-});
-ctxRemRoot.addEventListener('click', () => {
-  if(!ctxState || ctxState.numIdx === -1) return;
-  numRoots.splice(ctxState.numIdx, 1);
-  hideMenu(); draw(); updateDisplay();
-});
-ctxDupAsymp.addEventListener('click', () => {
-  if(!ctxState || ctxState.denIdx === -1) return;
-  denRoots.push(denRoots[ctxState.denIdx]);  // exact duplicate
-  hideMenu(); draw(); updateDisplay();
-});
-ctxRemAsymp.addEventListener('click', () => {
-  if(!ctxState || ctxState.denIdx === -1) return;
-  denRoots.splice(ctxState.denIdx, 1);
-  hideMenu(); draw(); updateDisplay();
+function hover(px, py){
+  const c = candidates(px, py);
+  canvas.style.cursor = cursorFor(c);
+  const ids = new Set(c.map(h => h.id));
+  if([...ids].join() !== [...activeIds].join()){ activeIds = ids; draw(ctx); }
+}
+
+function endInteraction(e){
+  if(e.pointerId !== activePointer) return;                    // release of an ignored finger
+  resetInteraction();
+  if(e.pointerType === 'mouse' && e.type === 'pointerup'){ const [px, py] = getPos(e); hover(px, py); }
+  else { canvas.style.cursor = 'default'; activeIds = new Set(); draw(ctx); }
+}
+canvas.addEventListener('pointerup', endInteraction);
+canvas.addEventListener('pointercancel', endInteraction);
+canvas.addEventListener('lostpointercapture', endInteraction);
+// leaving the page (switching windows, etc.) also ends any interaction
+window.addEventListener('blur', () => { if(activePointer !== null){ resetInteraction(); activeIds = new Set(); draw(ctx); } });
+canvas.addEventListener('pointerleave', () => {
+  if(activePointer === null && activeIds.size){ activeIds = new Set(); draw(ctx); }
 });
 
-// Dismiss on outside click, Escape, or scroll
-document.addEventListener('click', e => { if(!ctxMenu.contains(e.target)) hideMenu(); });
-document.addEventListener('keydown', e => { if(e.key === 'Escape') hideMenu(); });
+// keep the view inside the zoom limits and away from huge coordinates
+function clampView(){
+  const fix = (lo, hi) => {
+    let span = clamp(hi - lo, SPAN_MIN, SPAN_MAX), mid = clamp((lo + hi) / 2, -COORD_MAX, COORD_MAX);
+    return [mid - span / 2, mid + span / 2];
+  };
+  if(!(xMax - xMin >= SPAN_MIN && xMax - xMin <= SPAN_MAX && Math.abs(xMin) < COORD_MAX && Math.abs(xMax) < COORD_MAX))
+    [xMin, xMax] = fix(xMin, xMax);
+  if(!(yMax - yMin >= SPAN_MIN && yMax - yMin <= SPAN_MAX && Math.abs(yMin) < COORD_MAX && Math.abs(yMax) < COORD_MAX))
+    [yMin, yMax] = fix(yMin, yMax);
+}
 
-// ─────────────────────────────────────────────────────────────────
-//  ZOOM AXIS SELECTOR
-// ─────────────────────────────────────────────────────────────────
-let zoomAxis = 'both';  // 'both' | 'x' | 'y'
-
-const zoomBtns = {
-  both: document.getElementById('zoom-xy'),
-  x:    document.getElementById('zoom-x'),
-  y:    document.getElementById('zoom-y'),
-};
+// ── zoom axis selector ──
+let zoomAxis = 'both';
+const zoomBtns = { both: document.getElementById('zoom-xy'),
+                   x: document.getElementById('zoom-x'),
+                   y: document.getElementById('zoom-y') };
 Object.entries(zoomBtns).forEach(([mode, btn]) => {
   btn.addEventListener('click', e => {
-    e.stopPropagation();  // don't trigger canvas pan
+    e.stopPropagation();
     zoomAxis = mode;
     Object.values(zoomBtns).forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
   });
 });
 
-// ─────────────────────────────────────────────────────────────────
-//  SCROLL ZOOM
-// ─────────────────────────────────────────────────────────────────
+// ── scroll zoom about the mouse ──
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
-  hideMenu();
-  const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
-
-  const [cpx, cpy] = getPos(e);
-  const mouseX = xMin + (cpx / canvas.width)  * (xMax - xMin);
-  const mouseY = yMin + (1 - cpy / canvas.height) * (yMax - yMin);
-
+  // proportional to the scroll amount, so trackpads zoom smoothly
+  const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+  const factor = clamp(Math.exp(dy * 0.0015), 0.5, 2);
+  const [px, py] = getPos(e);
+  const mx = invX(px), my = invY(py);
   if(zoomAxis !== 'y'){
-    xMin = mouseX + (xMin - mouseX) * factor;
-    xMax = mouseX + (xMax - mouseX) * factor;
+    const f = clamp((xMax - xMin) * factor, SPAN_MIN, SPAN_MAX) / (xMax - xMin);
+    xMin = mx + (xMin - mx) * f; xMax = mx + (xMax - mx) * f;
   }
   if(zoomAxis !== 'x'){
-    yMin = mouseY + (yMin - mouseY) * factor;
-    yMax = mouseY + (yMax - mouseY) * factor;
+    const f = clamp((yMax - yMin) * factor, SPAN_MIN, SPAN_MAX) / (yMax - yMin);
+    yMin = my + (yMin - my) * f; yMax = my + (yMax - my) * f;
   }
-  draw();
+  draw(ctx);
 }, { passive: false });
 
-// Double-click to reset view
-canvas.addEventListener('dblclick', () => {
-  xMin = -5; xMax = 5; yMin = -10; yMax = 10;
-  draw();
-});
-
-
-function resizeCanvas(){ setCanvasSize(); draw(); }
-window.addEventListener('resize', resizeCanvas);
+canvas.addEventListener('dblclick', () => { resetView(); draw(ctx); });
 
 // ─────────────────────────────────────────────────────────────────
-//  URL STATE — encode/decode
+//  URL STATE
 // ─────────────────────────────────────────────────────────────────
 function encodeState(){
-  const r = v => Math.round(v * 10) / 10;
-  const params = new URLSearchParams();
-  params.set('n', numRoots.map(r).join(','));
-  params.set('d', denRoots.map(r).join(','));
-  params.set('a', r(scale));
-  params.set('v', [xMin, xMax, yMin, yMax].map(r).join(','));
-  return params;
+  const p = new URLSearchParams();
+  if(TOOL.encode) TOOL.encode(p, S, fmt);
+  else for(const k of TOOL.keys) p.set(k, fmt(S[k]));
+  if(intMode) p.set('int', '1');
+  p.set('v', [xMin, xMax, yMin, yMax].map(v => fmt(Math.round(v * 100) / 100)).join(','));
+  return p;
 }
-
 function loadFromURL(){
-  const params = new URLSearchParams(window.location.search);
+  const p = new URLSearchParams(window.location.search);
   try {
-    if(params.has('n')){
-      const ns = params.get('n') === '' ? [] : params.get('n').split(',').map(Number).filter(isFinite);
-      numRoots = ns;
-    }
-    if(params.has('d')){
-      const ds = params.get('d') === '' ? [] : params.get('d').split(',').map(Number).filter(isFinite);
-      denRoots = ds;
-    }
-    if(params.has('a')){
-      const a = Number(params.get('a'));
-      if(isFinite(a)){ scale = a; slider.value = a; scaleVal.textContent = fmtNum(a); }
-    }
-    if(params.has('v')){
-      const [x0, x1, y0, y1] = params.get('v').split(',').map(Number);
-      if([x0,x1,y0,y1].every(isFinite) && x1>x0 && y1>y0){
-        xMin=x0; xMax=x1; yMin=y0; yMax=y1;
+    if(TOOL.decode) TOOL.decode(p, S);
+    else {
+      // each value is checked on its own: a bad one is ignored, the rest still load
+      for(const k of TOOL.keys){
+        const raw = p.get(k);
+        if(raw === null || raw.trim() === '') continue;
+        const v = Number(raw);
+        if(!isFinite(v) || Math.abs(v) > 1e6) continue;
+        const trial = { ...S, [k]: parseFloat(v.toFixed(6)) };
+        if(!TOOL.validate || TOOL.validate(trial)) Object.assign(S, trial);
       }
     }
-  } catch(e){ /* malformed URL — just use defaults */ }
+    if(TOOL.roundToInt && p.get('int') === '1'){ intMode = true; TOOL.roundToInt(S); }
+    if(p.has('v')){
+      const [x0, x1, y0, y1] = p.get('v').split(',').map(Number);
+      if([x0, x1, y0, y1].every(isFinite) && x1 > x0 && y1 > y0){
+        xMin = x0; xMax = x1; yMin = y0; yMax = y1;
+        clampView();
+      }
+    }
+  } catch(e){ /* malformed URL — keep defaults */ }
 }
 
 // ─────────────────────────────────────────────────────────────────
-//  EXPORT PNG  (always light mode, white background)
+//  EXPORT PNG  (always light mode, white background, 2× resolution)
 // ─────────────────────────────────────────────────────────────────
 document.getElementById('btn-export').addEventListener('click', () => {
-  // Create an off-screen canvas the same size as the plot
   const out = document.createElement('canvas');
-  out.width  = canvas.width;
-  out.height = canvas.height;
+  const k = 2;
+  out.width = W * k; out.height = H * k;
   const oc = out.getContext('2d');
-
-  // Fill white background first (canvas default is transparent)
-  oc.fillStyle = '#ffffff';
-  oc.fillRect(0, 0, out.width, out.height);
-
-  // Force light-mode colors by temporarily patching matchMedia,
-  // redirect draw() to the off-screen canvas via activeCtx
-  const origMatchMedia = window.matchMedia.bind(window);
-  window.matchMedia = q =>
-    q === '(prefers-color-scheme: dark)' ? { matches: false } : origMatchMedia(q);
-
-  activeCtx = oc;
-  draw();
-  activeCtx = ctx;
-  window.matchMedia = origMatchMedia;
-
-  // Trigger download
+  oc.scale(k, k);
+  const saved = activeIds; activeIds = new Set();
+  forceLight = true;
+  draw(oc);
+  forceLight = false;
+  activeIds = saved;
   const link = document.createElement('a');
-  link.download = 'rational_function.png';
+  link.download = TOOL.file + '.png';
   link.href = out.toDataURL('image/png');
   link.click();
 });
@@ -1154,21 +1003,121 @@ document.getElementById('btn-export').addEventListener('click', () => {
 //  COPY LINK
 // ─────────────────────────────────────────────────────────────────
 document.getElementById('btn-share').addEventListener('click', () => {
-  const url = `${location.origin}${location.pathname}?${encodeState()}`;
-  navigator.clipboard.writeText(url).then(() => {
-    const btn = document.getElementById('btn-share');
-    btn.textContent = '✓ Copied!';
-    btn.classList.add('flash');
-    setTimeout(() => { btn.textContent = '🔗 Copy link'; btn.classList.remove('flash'); }, 2000);
-  });
+  const url = `${location.href.split(/[?#]/)[0]}?${encodeState()}`;
+  const btn = document.getElementById('btn-share');
+  const done = () => {
+    btn.textContent = '✓ Copied!'; btn.classList.add('copied');
+    setTimeout(() => { btn.innerHTML = '&#x1F517; Copy link'; btn.classList.remove('copied'); }, 2000);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(done, () => fallbackCopy(url, done));
+  } else fallbackCopy(url, done);
 });
+function fallbackCopy(text, done){
+  const ta = document.createElement('textarea');
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch(e){}
+  ta.remove();
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  INTEGER LOCK
+// ─────────────────────────────────────────────────────────────────
+const intLock = document.getElementById('int-lock');
+function applyIntLock(){
+  intLock.classList.toggle('on', intMode);
+  intLock.setAttribute('aria-checked', String(intMode));
+}
+function toggleIntLock(){
+  intMode = !intMode;
+  if(intMode){ TOOL.roundToInt(S); if(TOOL.onEdit) TOOL.onEdit(); }   // snap current values, then redraw
+  applyIntLock();
+  render();
+}
+if(TOOL.roundToInt){
+  intLock.style.display = 'flex';
+  intLock.addEventListener('click', toggleIntLock);
+  intLock.addEventListener('keydown', e => { if(e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); toggleIntLock(); } });
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  RATIONAL TOOL — PAGE CONTROLS  (scale slider, right-click menu)
+// ═════════════════════════════════════════════════════════════════
+document.getElementById('scale-slider').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  S.a = intMode ? Math.round(v) : Math.round(v * 10) / 10;
+  if(S.a === 0) S.a = 0;                           // no negative zero
+  render();
+});
+
+// right-click (or long-press) near the x-axis: add a root / asymptote,
+// or duplicate / remove the dot under the pointer
+const ctxMenu = document.getElementById('ctx-menu');
+const menuBtn = id => document.getElementById(id);
+let ctxState = null;   // { x, numIdx, denIdx }
+
+function hideMenu(){ ctxMenu.style.display = 'none'; ctxState = null; }
+function showMenu(cx, cy){
+  ctxMenu.style.display = 'block';
+  const w = ctxMenu.offsetWidth, h = ctxMenu.offsetHeight;
+  ctxMenu.style.left = (cx + w > window.innerWidth  ? cx - w : cx) + 'px';
+  ctxMenu.style.top  = (cy + h > window.innerHeight ? cy - h : cy) + 'px';
+}
+
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  resetInteraction();                              // a long-press may have started a pan
+  const [px, py] = getPos(e);
+  if(Math.abs(py - Y(0)) > 18){ hideMenu(); return; }
+  const nearest = list => {                        // index of the closest dot within reach, or −1
+    let best = -1;
+    list.forEach((r, i) => {
+      const d = Math.abs(X(r) - px);
+      if(d < HIT() && (best < 0 || d < Math.abs(X(list[best]) - px))) best = i;
+    });
+    return best;
+  };
+  const x = intMode ? (Math.round(invX(px)) || 0) : snap(invX(px), stepX());
+  ctxState = { x, numIdx: nearest(S.num), denIdx: nearest(S.den) };
+  const onDot = ctxState.numIdx >= 0 || ctxState.denIdx >= 0;
+  const vis = { 'ctx-add-root': !onDot, 'ctx-add-asymp': !onDot,
+                'ctx-dup-root': ctxState.numIdx >= 0, 'ctx-rem-root': ctxState.numIdx >= 0,
+                'ctx-dup-asymp': ctxState.denIdx >= 0, 'ctx-rem-asymp': ctxState.denIdx >= 0 };
+  for(const [id, v] of Object.entries(vis)) menuBtn(id).style.display = v ? 'block' : 'none';
+  showMenu(e.clientX, e.clientY);
+});
+
+function menuAction(id, act){
+  menuBtn(id).addEventListener('click', () => {
+    if(!ctxState) return;
+    act(ctxState);
+    hideMenu();
+    activeIds = new Set();                         // handle ids shift when dots come and go
+    render();
+  });
+}
+menuAction('ctx-add-root',  st => S.num.push(st.x));
+menuAction('ctx-add-asymp', st => S.den.push(st.x));
+menuAction('ctx-dup-root',  st => S.num.push(S.num[st.numIdx]));
+menuAction('ctx-rem-root',  st => S.num.splice(st.numIdx, 1));
+menuAction('ctx-dup-asymp', st => S.den.push(S.den[st.denIdx]));
+menuAction('ctx-rem-asymp', st => S.den.splice(st.denIdx, 1));
+
+document.addEventListener('pointerdown', e => { if(!ctxMenu.contains(e.target)) hideMenu(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape') hideMenu(); });
+canvas.addEventListener('wheel', hideMenu);
+window.addEventListener('blur', hideMenu);
 
 // ─────────────────────────────────────────────────────────────────
 //  INIT
 // ─────────────────────────────────────────────────────────────────
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+window.addEventListener('resize', () => { hideMenu(); setCanvasSize(); render(); });
 loadFromURL();
-resizeCanvas();
+applyIntLock();
+document.title = TOOL.title;
+setCanvasSize();
+render();
 </script>
 </body>
 </html>
-
